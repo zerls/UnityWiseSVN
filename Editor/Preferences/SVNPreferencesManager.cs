@@ -55,6 +55,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			// UI display language. Auto follows Unity's Application.systemLanguage.
 			public WiseSVNLanguage Language = WiseSVNLanguage.Auto;
 
+			public WiseSVNIconStyle IconStyle = WiseSVNIconStyle.Classic;
+
 #if UNITY_2020_2_OR_NEWER
 			[NonReorderable]
 #endif
@@ -274,24 +276,34 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		private void LoadTextures()
 		{
+			bool modern = PersonalPrefs.IconStyle == WiseSVNIconStyle.Modern;
+
 			FileStatusIcons = new GUIContent[Enum.GetValues(typeof(VCFileStatus)).Length];
-			FileStatusIcons[(int)VCFileStatus.Normal] = LoadTexture("SVNOverlayIcons/SVNNormalIcon");
-			FileStatusIcons[(int)VCFileStatus.Added] = LoadTexture("SVNOverlayIcons/SVNAddedIcon");
-			FileStatusIcons[(int)VCFileStatus.Modified] = LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
-			FileStatusIcons[(int)VCFileStatus.Replaced] = LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
-			FileStatusIcons[(int)VCFileStatus.Deleted] = LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
-			FileStatusIcons[(int)VCFileStatus.Conflicted] = LoadTexture("SVNOverlayIcons/SVNConflictIcon");
-			FileStatusIcons[(int)VCFileStatus.Ignored] = LoadTexture("SVNOverlayIcons/SVNIgnoredIcon", LocalizationManager.Tr("overlay.tooltip.ignored"));
-			FileStatusIcons[(int)VCFileStatus.Unversioned] = LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
-			FileStatusIcons[(int)VCFileStatus.Excluded] = LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon", LocalizationManager.Tr("overlay.tooltip.excluded"));
+			FileStatusIcons[(int)VCFileStatus.Normal]      = modern ? LoadBuiltinIcon("d_Valid",               null)                                                    : LoadTexture("SVNOverlayIcons/SVNNormalIcon");
+			FileStatusIcons[(int)VCFileStatus.Added]       = modern ? LoadBuiltinIcon("d_Toolbar Plus",        null)                                                    : LoadTexture("SVNOverlayIcons/SVNAddedIcon");
+			FileStatusIcons[(int)VCFileStatus.Modified]    = modern ? LoadBuiltinIcon("d_console.warnicon.sml",null)                                                    : LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
+			FileStatusIcons[(int)VCFileStatus.Replaced]    = modern ? LoadBuiltinIcon("d_console.warnicon.sml",null)                                                    : LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
+			FileStatusIcons[(int)VCFileStatus.Deleted]     = modern ? LoadBuiltinIcon("d_TreeEditor.Trash",    null)                                                    : LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
+			FileStatusIcons[(int)VCFileStatus.Conflicted]  = modern ? LoadBuiltinIcon("d_console.erroricon.sml",null)                                                   : LoadTexture("SVNOverlayIcons/SVNConflictIcon");
+			FileStatusIcons[(int)VCFileStatus.Ignored]     = modern ? LoadBuiltinIcon("d_Invalid",             LocalizationManager.Tr("overlay.tooltip.ignored"))      : LoadTexture("SVNOverlayIcons/SVNIgnoredIcon",     LocalizationManager.Tr("overlay.tooltip.ignored"));
+			FileStatusIcons[(int)VCFileStatus.Unversioned] = modern ? LoadBuiltinIcon("d_PreTextureRGB",       null)                                                    : LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
+			FileStatusIcons[(int)VCFileStatus.Excluded]    = modern ? LoadBuiltinIcon("d_Invalid",             LocalizationManager.Tr("overlay.tooltip.excluded"))     : LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon",    LocalizationManager.Tr("overlay.tooltip.excluded"));
 
 			LockStatusIcons = new GUIContent[Enum.GetValues(typeof(VCLockStatus)).Length];
-			LockStatusIcons[(int)VCLockStatus.LockedHere] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon", LocalizationManager.Tr("overlay.tooltip.locked_here"));
-			LockStatusIcons[(int)VCLockStatus.BrokenLock] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
-			LockStatusIcons[(int)VCLockStatus.LockedOther] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
-			LockStatusIcons[(int)VCLockStatus.LockedButStolen] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
+			LockStatusIcons[(int)VCLockStatus.LockedHere]       = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_here"))   : LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon",  LocalizationManager.Tr("overlay.tooltip.locked_here"));
+			LockStatusIcons[(int)VCLockStatus.BrokenLock]       = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.broken_lock"))   : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
+			LockStatusIcons[(int)VCLockStatus.LockedOther]      = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_other"))  : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
+			LockStatusIcons[(int)VCLockStatus.LockedButStolen]  = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_stolen")) : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
 
-			RemoteStatusIcons = LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
+			RemoteStatusIcons = modern
+				? LoadBuiltinIcon("d_Download-Available@2x", LocalizationManager.Tr("overlay.tooltip.remote_changes"))
+				: LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
+		}
+
+		private static GUIContent LoadBuiltinIcon(string iconName, string tooltip)
+		{
+			var content = EditorGUIUtility.IconContent(iconName);
+			return content != null ? new GUIContent(content.image, tooltip) : GUIContent.none;
 		}
 
 		public static GUIContent LoadTexture(string path, string tooltip = null)
@@ -336,6 +348,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			if (LocalizationManager.Language != PersonalPrefs.Language) {
 				LocalizationManager.SetLanguage(PersonalPrefs.Language);
 			}
+
+			// Reload textures (icon style may have changed).
+			LoadTextures();
 
 			PreferencesChanged?.Invoke();
 		}

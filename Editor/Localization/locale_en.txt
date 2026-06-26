@@ -41,6 +41,8 @@ prefs.save_changes=Save changes:
 prefs.enable_svn=Enable SVN integration
 prefs.enable_overlay_icons=Enable overlay icons
 prefs.enable_overlay_icons.tooltip=Enables overlay icons in the project windows.\nPopulates internal cache with statuses of changed entities.\nFile changes may trigger repopulation of the cache.
+prefs.icon_style=Icon Style
+prefs.icon_style.tooltip=Classic uses the original TortoiseSVN-style PNG icons.\nModern uses Unity built-in editor icons that adapt to the current color theme.
 prefs.scan_svn_ignores=Scan for svn-ignores
 prefs.scan_svn_ignores.tooltip=Enables svn-ignore overlay icons in the project windows. If disabled, svn-ignored items will be considered as Normal status (green icon).
 prefs.show_normal_icon=Show Normal status green icon
@@ -213,6 +215,15 @@ cli.assets_auto_refresh_disabled=Assets Auto Refresh Disabled!
 cli.clear_output=Clear Output
 cli.copy_output=Copy Output
 cli.run=Run
+
+# ========== SVN Status Bar Overlay (SceneView) ==========
+overlay.svnstatus.disabled=SVN disabled
+overlay.svnstatus.modified=M
+overlay.svnstatus.remote=R
+overlay.svnstatus.menu.update_all=Update All
+overlay.svnstatus.menu.commit_all=Commit All
+overlay.svnstatus.menu.refresh=Refresh Icons
+overlay.svnstatus.menu.refresh_branch=Refresh Branch Name
 
 # ========== SVN Locked Overlay (SceneView) ==========
 sceneview.scene_outofdate=Scene \"{0}\" is out of date in SVN!

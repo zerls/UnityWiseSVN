@@ -238,7 +238,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Assets/SVN/\u2935  Update All", false, MenuItemPriorityStart + 20)]
+		[MenuItem("Assets/SVN/\u2935  Update All %&u", false, MenuItemPriorityStart + 20)]
 		public static void UpdateAll()
 		{
 			// It is recommended to freeze Unity while updating.
@@ -268,7 +268,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Assets/SVN/\u2197  Commit All", false, MenuItemPriorityStart + 40)]
+		[MenuItem("Assets/SVN/\u2197  Commit All %&s", false, MenuItemPriorityStart + 40)]
 		public static void CommitAll()
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(

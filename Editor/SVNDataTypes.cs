@@ -78,6 +78,12 @@ namespace DevLocker.VersionControl.WiseSVN
 		UseAddAndDeleteForAllAssets = 4,
 	}
 
+	public enum WiseSVNIconStyle
+	{
+		Classic = 0,    // TortoiseSVN-style PNG icons (original set)
+		Modern = 1,     // Unity built-in editor icons (theme-aware)
+	}
+
 	public enum LockOperationResult
 	{
 		Success = 0,				// Operation succeeded.
