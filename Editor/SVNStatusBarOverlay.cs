@@ -46,7 +46,7 @@ namespace DevLocker.VersionControl.WiseSVN
 			int modifiedCount = 0;
 			int remoteCount = 0;
 
-			if (SVNStatusesDatabase.Initialized) {
+			if (SVNStatusesDatabase.Instance.IsReady) {
 				var statuses = SVNStatusesDatabase.Instance.GetAllKnownStatusData(true, false, false);
 				foreach (var s in statuses) {
 					if (s.Status != VCFileStatus.Normal
@@ -79,7 +79,7 @@ namespace DevLocker.VersionControl.WiseSVN
 				menu.AddItem(new GUIContent(Tr("overlay.svnstatus.menu.update_all")), false, SVNContextMenusManager.UpdateAll);
 				menu.AddItem(new GUIContent(Tr("overlay.svnstatus.menu.commit_all")), false, SVNContextMenusManager.CommitAll);
 				menu.AddItem(new GUIContent(Tr("overlay.svnstatus.menu.refresh")), false, () => {
-					if (SVNStatusesDatabase.Initialized)
+					if (SVNStatusesDatabase.Instance.IsReady)
 						SVNStatusesDatabase.Instance.InvalidateDatabase();
 				});
 				menu.AddSeparator(string.Empty);
