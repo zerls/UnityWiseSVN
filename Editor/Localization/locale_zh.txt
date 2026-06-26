@@ -1,0 +1,277 @@
+# WiseSVN 中文语言包（简体中文）。UTF-8 编码。
+# 格式：key=value   （\n 表示换行，\" 表示引号，# 开头为注释）
+
+# ========== 通用 ==========
+common.ok=确定
+common.cancel=取消
+common.yes=是
+common.no=否
+common.close=关闭
+common.save_all=全部保存
+common.refresh=刷新
+common.add=添加
+common.remove=删除
+common.apply=应用
+common.unknown=未知
+common.scanning=正在扫描...
+common.working=运行中...
+common.aborting=正在中止...
+common.aborted=已中止！
+common.completed=完成！
+common.failed=失败！
+common.error=错误
+
+# ========== 语言选择 ==========
+prefs.language=语言
+prefs.language.tooltip=WiseSVN UI 显示语言。"自动"会跟随 Unity 系统语言。
+prefs.language.auto=自动（系统）
+prefs.language.english=English
+prefs.language.chinese_simplified=简体中文
+
+# ========== 偏好设置窗口 ==========
+prefs.window.title=Wise SVN 偏好设置
+prefs.tab.personal=个人
+prefs.tab.project=项目
+prefs.tab.about=关于
+
+prefs.personal.help=以下是存储在注册表中的个人偏好设置。\n提示：注意查看各项的悬浮说明。
+prefs.project.help=以下设置将保存到 ProjectSettings 文件夹中。\n建议将其纳入版本控制系统。\n修改时请与团队成员协调。
+
+prefs.save_changes=保存修改：
+prefs.enable_svn=启用 SVN 集成
+prefs.enable_overlay_icons=启用覆盖图标
+prefs.enable_overlay_icons.tooltip=在 Project 窗口中显示 SVN 状态覆盖图标。\n会维护一份变更实体的状态缓存。\n文件变更可能触发缓存重建。
+prefs.scan_svn_ignores=扫描 svn-ignore
+prefs.scan_svn_ignores.tooltip=启用 svn-ignore 覆盖图标。若关闭，svn 已忽略项将被视为 Normal 状态（绿色图标）。
+prefs.show_normal_icon=显示 Normal 状态绿色图标
+prefs.show_normal_icon.tooltip=Normal 状态表示已纳入版本控制且无变更的资源。
+prefs.show_excluded_icon=显示已忽略 / 已排除的灰色图标
+prefs.show_excluded_icon.tooltip=为 svn-ignore 项或排除列表中的项显示灰色图标。该判断不递归。
+prefs.refresh_interval=覆盖图标刷新间隔
+prefs.refresh_interval.tooltip=两次自动刷新覆盖图标的间隔秒数。\n注意：-1 表示禁用自动刷新，仅文件变更时才刷新。
+prefs.check_repo_changes=检查仓库远端变更
+prefs.check_repo_changes.tooltip=联机模式 —— 会询问服务器是否有新变更。\n启用后会显示锁定和过期等附加图标。\n网络通信会让刷新略慢，但不会影响编辑器性能。\n\n注意：此项会覆盖项目偏好。请与团队协调。
+prefs.authenticate=身份验证
+prefs.auto_lock_when_modified=修改时自动锁定
+prefs.auto_lock_when_modified.tooltip=资源被修改后，若条件允许将自动锁定，而非弹窗询问。\n若服务器有更新版本或被他人锁定，仍会弹窗。\n\n仅在项目偏好已启用"锁定提示"时生效。
+prefs.sceneview_conflicts=Scene 视图冲突提示
+prefs.sceneview_conflicts.tooltip=当前 Scene 或编辑中的 Prefab 过期或被锁定时，在 Scene 视图显示警告。
+prefs.ask_on_moving_folders=移动文件夹时询问
+prefs.ask_on_moving_folders.tooltip=在 Unity 中移动文件夹时请求确认。
+prefs.svn_cli_path=SVN CLI 路径
+prefs.svn_cli_path.tooltip=指定 SVN CLI（svn.exe）路径，或留空使用默认值。\n\n注意：此项会覆盖项目偏好。请与团队协调。
+prefs.svn_cli_path_macos=SVN CLI 路径（macOS）
+prefs.svn_cli_path_macos.tooltip=同上，针对 macOS 平台。
+prefs.context_menus_client=右键菜单客户端
+prefs.context_menus_client.tooltip=选择右键菜单使用的 SVN 客户端。
+prefs.context_menus_client_issue=右键菜单客户端问题
+prefs.trace_logs=跟踪日志
+prefs.trace_logs.tooltip=用于调试的详细日志开关。
+prefs.exclude_paths=排除路径
+prefs.exclude_paths.tooltip=相对路径（含 '/'）或文件名，将被 SVN 集成忽略。请谨慎使用。\n\n示例："Assets/Scenes/Baked" 或 "_deprecated"
+
+prefs.assets_move_behaviour=资源移动行为
+prefs.assets_move_behaviour.tooltip=某些 SVN 仓库需要把 move 拆分为 add + delete（会丢失历史）。请谨慎使用。
+prefs.lockprompt_require_overlay=锁定提示需要在"个人偏好"中启用覆盖图标功能！
+prefs.enable_lock_prompts=启用锁定提示
+prefs.enable_lock_prompts.tooltip=资源或其 meta 被修改时，弹窗询问用户是否锁定。
+prefs.lockprompt_hint_title=锁定提示说明：
+prefs.lockprompt_hint=资源或其 meta 被修改时弹窗询问用户是否锁定/忽略。\n窗口会显示资源是否被他人锁定或已过期（这些情况下无法锁定）。\n若用户选择不锁定，对这些资源不会再次弹窗。\n编辑器重启后会重新询问所有已修改但未锁定的资源。\n\n请在下方列出需要监控锁定的资源目录和资源类型。\n要监控整个项目，将 TargetFolder 设为 "Assets"。\n请与团队协调并提交此偏好。\n至少需要一条规则才能生效。
+prefs.lock_message=锁定提交信息
+
+prefs.branches_db_hint_title=分支数据库说明：
+prefs.enable_branches_db=启用分支数据库
+prefs.enable_branches_db.tooltip=扫描 SVN 仓库中的所有分支并维护一个简单数据库。\n\n单次扫描可能需要几分钟，取决于网络情况和仓库复杂度。
+prefs.branches_scan_params=分支扫描参数
+prefs.branches_scan_params.tooltip=至少需要一条配置才能生效。
+prefs.pinned_branches=固定分支
+prefs.pinned_branches.tooltip=置顶显示的分支。
+
+prefs.version=版本：{0}
+prefs.help=帮助：
+prefs.documentation=文档
+prefs.documentation_missing.title=文档缺失！
+prefs.documentation_missing.message=请求的文档不存在。
+prefs.copy_report_data=复制报告数据到剪贴板
+prefs.about=关于：
+prefs.created_by=作者：Filip Slavov
+prefs.in_collaboration=与 Snapshot Games 合作
+prefs.fork_note=本 fork 版本增加了国际化与忽略管理功能。
+prefs.asset_store=资源商店
+prefs.github=GitHub
+prefs.unity_forum=Unity 论坛
+prefs.reddit=Reddit
+prefs.openupm=OpenUPM
+prefs.icons_credit=图标来源：TortoiseSVN（作者 Lübbe Onken）
+prefs.random_video=随机视频：
+prefs.random_video.hint=制作这个插件花了不少时间。\n下面是一些值得分享的随机视频，开发途中带来的小乐子。:D
+prefs.next_video=下一个
+
+prefs.svn_binary_missing.title=找不到 SVN 可执行文件
+prefs.svn_binary_missing.message=找不到偏好设置中指定的 svn 可执行文件：\n"{0}"
+prefs.lockprompt_dialog.title=锁定提示
+prefs.lockprompt_dialog.need_entry=要使用锁定提示，必须至少提供一条参数配置。\n\n锁定提示已被禁用。
+prefs.lockprompt_dialog.invalid=部分锁定提示参数无效，请修正。\n\n锁定提示已被禁用。
+prefs.branches_db_dialog.title=分支数据库
+prefs.branches_db_dialog.need_entry=要使用分支数据库，必须至少提供一条扫描参数配置。\n\n分支数据库已被禁用。
+prefs.branches_db_dialog.invalid=部分分支扫描参数无效，请修正。\n\n分支数据库已被禁用。
+prefs.svn_authenticate.title=SVN 身份验证
+prefs.svn_authenticate.message=本流程会打开一个终端窗口，向你的 SVN 仓库发起在线请求，并要求验证账号。\n\n此过程由 SVN CLI 执行，WiseSVN 不会知晓或存储你的账号密码。
+prefs.svn_authenticate.proceed=继续
+
+prefs.ignore_manager_button=打开忽略管理器
+
+# ========== 锁定提示窗口 ==========
+lockprompt.window.title=SVN 锁定已修改资源
+lockprompt.auto_locking_notification=正在 SVN 中自动锁定 {0} 个资源
+lockprompt.header=锁定已修改资源
+lockprompt.silence=静默！
+lockprompt.silence.tooltip=抑制所有锁定提示和自动锁定行为，直到 Unity 重启或通过菜单 "{0}" 重置。
+lockprompt.silence.confirm_title=要静默锁定提示吗？
+lockprompt.silence.confirm_msg={0}\n\n适用于本地测试但暂不提交的场景。\n\n确定吗？
+lockprompt.what_are_locks=什么是锁定？
+lockprompt.what_are_locks.help=大团队协作时多人可能同时修改同一文件而互不知情。\n先把变更提交到服务器的那一方"保存"了工作。\n后提交者将不得不处理由此产生的冲突。\n这可能导致工作丢失。为避免这种情况，开始编辑文件前可以在服务器上"锁定"它。\n这样能告知其他人此文件已有人在编辑。
+lockprompt.steal_locks=强制夺取锁
+lockprompt.what_is_steal=什么是"强制夺取锁"？
+lockprompt.what_is_steal.help=以下资源有本地修改且均已被他人锁定。你可以强制夺取其锁。\n他人可能正在编辑这些资源，提交你的变更可能给将来带来冲突。\n\n请与原锁拥有者协调，选择需要强制锁定的资源。
+lockprompt.auto_lock=条件允许时自动锁定
+lockprompt.auto_lock.tooltip_extra=\n\n可在 SVN 偏好设置中修改。
+lockprompt.skip_help=跳过锁定的资源在状态变更或 Unity 重启前不会再次弹窗。\n要强制重新评估所有锁，请选择菜单 "{0}"。
+lockprompt.col.lock=锁定
+lockprompt.col.asset=资源
+lockprompt.col.revert=回滚
+lockprompt.col.owner=持有者
+lockprompt.scanning=正在扫描变更...
+lockprompt.out_of_date=已过期！
+lockprompt.out_of_date.tooltip=无法锁定：服务器有更新版本。需要先更新。
+lockprompt.revert_asset=回滚资源
+lockprompt.check_changes=查看变更
+lockprompt.btn.toggle_selected=切换所选
+lockprompt.btn.refresh_all=全部刷新
+lockprompt.btn.update_all=全部更新
+lockprompt.btn.revert_all_window=回滚全部（窗口）
+lockprompt.btn.skip_all=全部跳过
+lockprompt.btn.lock_or_steal_selected=锁定或夺取所选
+lockprompt.btn.lock_selected=锁定所选
+lockprompt.deleted=已删除
+lockprompt.meta=meta
+lockprompt.moved_to_tooltip=已移动到...
+
+# ========== 分支选择窗口 ==========
+branches.window.title=分支选择器
+branches.menu_path=Assets/SVN/Branch Selector
+branches.refresh.tooltip=刷新分支缓存数据库。\n\n注意：单次扫描可能需要几分钟，取决于网络情况与仓库复杂度。
+branches.asset_label=资源：
+branches.search_label=搜索：
+branches.setup_required=要使用分支选择器，请先在项目偏好中启用并配置\n"分支数据库"...
+branches.open_project_prefs=打开项目偏好
+branches.scanning=正在扫描分支中的 Unity 项目...
+branches.select_target=请选择目标资源...
+branches.conflicts_label=冲突：
+branches.show_non_conflicts=显示无冲突：
+branches.limit_by=限制：
+branches.start_scan=开始扫描
+branches.stop_scan=停止扫描
+branches.scan_revisions.tooltip=从该分支最后改动版本回溯扫描的版本数量。
+branches.show_log.tooltip=查看此分支中目标资源的提交日志。
+branches.repo_browser.tooltip=在仓库浏览器中打开此分支的目标资源。
+branches.switch.tooltip=将工作副本切换到另一个分支。\n会打开 TortoiseSVN 对话框。
+branches.scan_conflicts.tooltip=扫描所有分支，查找潜在冲突。\n会查找目标资源在各分支中的变更。
+branches.conflicts.pending=待扫描 —— 等待冲突检测。
+branches.conflicts.found=目标资源在此分支有变更 —— 潜在冲突。
+branches.conflicts.normal=未发现冲突。
+branches.conflicts.added=资源在此分支被添加。
+branches.conflicts.missing=资源缺失。可能被删除或从未存在于此分支。
+branches.conflicts.error=扫描该分支时出错。请查看控制台日志。
+branches.error_scanning=扫描分支出错：{0}
+branches.count={0} 个分支
+branches.switch_op.title=切换操作
+branches.switch_op.msg=切换分支时需要关闭 Unity，是否关闭？\n\n原因：若 Unity 在 SVN 下载文件时处理资源，Library 可能损坏。
+branches.switch_op.yes=好！
+branches.switch_what.title=切换什么？
+branches.switch_what.msg=要切换什么？\n- 工作副本根目录（整个检出）\n- Unity 项目文件夹
+branches.switch_what.wc_root=工作副本根
+branches.switch_what.unity_project=Unity 项目
+
+# ========== CLI 上下文窗口 ==========
+cli.window.title=SVN CLI 窗口
+cli.command=命令
+cli.output=输出：
+cli.abort=中止
+cli.kill=终止
+cli.killing=终止中...
+cli.assets_auto_refresh_disabled=资源自动刷新已禁用！
+cli.clear_output=清空输出
+cli.copy_output=复制输出
+cli.run=运行
+
+# ========== Scene 视图覆盖警告 ==========
+sceneview.scene_outofdate=Scene "{0}" 在 SVN 中已过期！
+sceneview.scene_locked=Scene "{0}" 被 {1} 在 SVN 中锁定！
+sceneview.scene_lockbroken=Scene "{0}" 的 SVN 锁已失效！
+sceneview.prefab_outofdate=Prefab "{0}" 在 SVN 中已过期！
+sceneview.prefab_locked=Prefab "{0}" 被 {1} 在 SVN 中锁定！
+sceneview.prefab_lockbroken=Prefab "{0}" 的 SVN 锁已失效！
+
+# ========== 覆盖图标（Project 窗口） ==========
+overlay.integration_disabled.title=集成已禁用
+overlay.integration_disabled.msg=无法刷新图标：WiseSVN 集成已禁用。请检查偏好设置。
+overlay.refresh.title=SVN 刷新
+overlay.refresh.msg=正在检查所有 SVN 状态...
+overlay.data_incomplete.tooltip=部分或全部 SVN 覆盖图标被跳过，因为变更数量过多。\n如果有大量未版本控制文件，可加入 svn-ignore 列表。\n如果服务器仓库有大量变更，请先更新。
+overlay.lockdetails.title=SVN 锁定详情
+overlay.lockdetails.msg=文件：{0}\n锁状态：{1}\n持有者：{2}\n时间：{3}\n备注：\n{4}
+
+overlay.tooltip.ignored=此项目位于 svn-ignore 列表中。SVN 不会跟踪它。
+overlay.tooltip.excluded=此项目被 WiseSVN 排除监控，但 SVN 可能仍在跟踪它。请检查 WiseSVN 偏好的 Excludes 设置。
+overlay.tooltip.locked_here=你已锁定此文件。\n点击查看详情。
+overlay.tooltip.broken_lock=你持有的锁已失效（被他人夺取并释放）。\n点击查看详情。
+overlay.tooltip.locked_other=此文件被他人锁定。\n点击查看详情。
+overlay.tooltip.locked_stolen=你的锁被他人夺取。\n点击查看详情。
+overlay.tooltip.remote_changes=资源已过期，请更新以避免冲突。
+
+# ========== 忽略管理器窗口 ==========
+ignoremgr.window.title=SVN 忽略管理器
+ignoremgr.menu_path=Assets/SVN/Ignore Manager
+ignoremgr.toolbar.refresh=刷新
+ignoremgr.toolbar.refresh.tooltip=重新加载设置了 svn:ignore 属性的目录。
+ignoremgr.toolbar.apply=应用更改
+ignoremgr.toolbar.apply.tooltip=将所有未保存的模式变更写回 SVN。
+ignoremgr.toolbar.path=路径：
+ignoremgr.left_header=已设置 svn:ignore 的目录
+ignoremgr.empty_left=未发现 svn:ignore 属性。\n在 Project 窗口选中一个文件夹，然后点击下方的 "+" 开始为其管理模式。
+ignoremgr.add_directory=添加 Project 窗口中选中的文件夹用于管理。
+ignoremgr.right_no_dir=在左侧选择一个目录以查看其模式。
+ignoremgr.section.local=svn:ignore（仅此目录）
+ignoremgr.section.global=svn:global-ignores（递归，此处只读）
+ignoremgr.add_pattern_placeholder=新模式（例如 *.tmp）
+ignoremgr.add_pattern_btn=添加
+ignoremgr.remove_pattern_tooltip=删除此模式。
+ignoremgr.global_readonly_note=全局忽略仅可在工作副本根目录或通过 TortoiseSVN 编辑。此处仅供查看。
+ignoremgr.status.summary=共 {0} 条模式，分布在 {1} 个目录。
+ignoremgr.unsaved_changes.title=未保存的更改
+ignoremgr.unsaved_changes.msg=有待保存的模式更改，要立即应用吗？
+ignoremgr.apply_success=忽略模式已更新成功。
+ignoremgr.apply_failed=忽略模式更新失败，请查看控制台日志。
+ignoremgr.versioned_warn.title=模式匹配到已版本化文件
+ignoremgr.versioned_warn.msg=模式 "{0}" 匹配到一个已纳入版本控制的文件。SVN 忽略只对未版本化文件生效。模式仍会被添加，但你可能还需要将该文件标记为删除才能真正忽略。
+
+# ========== 右键菜单 / IgnoreToggle 对话框 ==========
+ctxmenu.ignore_versioned.title=忽略已版本化文件
+ctxmenu.ignore_versioned.msg=只有未版本化的文件能被忽略，所选文件已纳入版本控制（已提交）。可选项：\n1. 加入 "ignore-on-commit" 修改列表。TortoiseSVN 默认在提交时忽略它。\n2. 在 SVN 中标记为删除（保留本地文件），团队中所有人都将忽略它。需要提交此变更。\n\n"{0}"
+ctxmenu.ignore_versioned.add_changelist=加入 "ignore-on-commit"
+ctxmenu.ignore_versioned.mark_delete=标记删除并忽略
+
+ctxmenu.revert_file.title=回滚文件？
+ctxmenu.revert_file.msg=确定要回滚此文件及其 meta 吗？\n"{0}"
+
+# ========== 错误 / 通用对话框 ==========
+dialog.error.title=错误
+dialog.error.write_failed=写入文件失败：\n"{0}"\n\n数据未保存！请查看控制台日志。
+dialog.not_supported.title=不支持
+dialog.snail_resolve_all=抱歉，SnailSVN 暂不支持"全部解决冲突"。
+dialog.snail_resolve=抱歉，SnailSVN 暂不支持"解决冲突"。
+dialog.rabbit_resolve_all=RabbitSVN 暂不支持"全部解决冲突"。
+dialog.rabbit_resolve=RabbitSVN 暂不支持"解决冲突"。
+dialog.partial_branching.title=SVN 部分分支警告
+dialog.partial_branching.msg=项目中有些文件来自不同分支，这通常是误操作。\n\n切换分支时务必从检出的顶层目录执行，并选择"完全递归"！

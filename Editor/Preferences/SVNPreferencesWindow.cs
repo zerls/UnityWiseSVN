@@ -3,12 +3,15 @@
 using DevLocker.VersionControl.WiseSVN.LockPrompting;
 using DevLocker.VersionControl.WiseSVN.Branches;
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
+using DevLocker.VersionControl.WiseSVN.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using System.IO;
+
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN.Preferences
 {
@@ -51,7 +54,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		public static void ShowProjectPreferences(PreferencesTab tab)
 		{
-			var window = GetWindow<SVNPreferencesWindow>(true, "Wise SVN Preferences");
+			var window = GetWindow<SVNPreferencesWindow>(true, Tr("prefs.window.title"));
 			window.m_PersonalPrefs = SVNPreferencesManager.Instance.PersonalPrefs.Clone();
 			window.m_ProjectPrefs = SVNPreferencesManager.Instance.ProjectPrefs.Clone();
 			window.ShowUtility();
@@ -80,10 +83,12 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		private void OnEnable()
 		{
 			m_SerializedObject = new SerializedObject(this);
+			LocalizationManager.OnLanguageChanged += Repaint;
 		}
 
 		private void OnDisable()
 		{
+			LocalizationManager.OnLanguageChanged -= Repaint;
 			if (m_SerializedObject != null) {
 				m_SerializedObject.Dispose();
 			}
@@ -100,11 +105,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			EditorGUILayout.BeginHorizontal();
 			{
-				EditorGUILayout.LabelField("Save changes:", EditorStyles.boldLabel);
+				EditorGUILayout.LabelField(Tr("prefs.save_changes"), EditorStyles.boldLabel);
 
 				GUILayout.FlexibleSpace();
 
-				if (GUILayout.Button("Close", GUILayout.MaxWidth(60f))) {
+				if (GUILayout.Button(Tr("common.close"), GUILayout.MaxWidth(60f))) {
 					GUI.FocusControl("");
 					Close();
 					EditorGUIUtility.ExitGUI();
@@ -112,7 +117,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 				var prevColor = GUI.backgroundColor;
 				GUI.backgroundColor = Color.green / 1.2f;
-				if (GUILayout.Button("Save All", GUILayout.MaxWidth(150f))) {
+				if (GUILayout.Button(Tr("common.save_all"), GUILayout.MaxWidth(150f))) {
 
 					SanitizeBeforeSave();
 					SVNPreferencesManager.Instance.SavePreferences(m_PersonalPrefs, m_ProjectPrefs);
@@ -185,7 +190,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			if (m_ProjectPrefs.EnableLockPrompt) {
 
 				if (m_ProjectPrefs.LockPromptParameters.Count == 0) {
-					EditorUtility.DisplayDialog("Lock Prompt", "In order to use lock prompts, you must provide at least one lock prompt parameters element.\n\nLock Prompt will be disabled.", "Ok");
+					EditorUtility.DisplayDialog(Tr("prefs.lockprompt_dialog.title"), Tr("prefs.lockprompt_dialog.need_entry"), Tr("common.ok"));
 					m_ProjectPrefs.EnableLockPrompt = false;
 				}
 
@@ -194,7 +199,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 					.ToList();
 
 				if (m_ProjectPrefs.LockPromptParameters.Any(sp => !sp.IsValid)) {
-					EditorUtility.DisplayDialog("Lock Prompt", "Some of the lock prompt parameters have invalid data. Please fix it.\n\nLock Prompt will be disabled.", "Ok");
+					EditorUtility.DisplayDialog(Tr("prefs.lockprompt_dialog.title"), Tr("prefs.lockprompt_dialog.invalid"), Tr("common.ok"));
 					m_ProjectPrefs.EnableLockPrompt = false;
 				}
 			}
@@ -202,7 +207,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			if (m_ProjectPrefs.EnableBranchesDatabase) {
 
 				if (m_ProjectPrefs.BranchesDatabaseScanParameters.Count == 0) {
-					EditorUtility.DisplayDialog("Branches Database", "In order to use Branches Database, you must provide at least one scan parameters element.\n\nBranches Database will be disabled.", "Ok");
+					EditorUtility.DisplayDialog(Tr("prefs.branches_db_dialog.title"), Tr("prefs.branches_db_dialog.need_entry"), Tr("common.ok"));
 					m_ProjectPrefs.EnableBranchesDatabase = false;
 				}
 
@@ -213,7 +218,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				m_ProjectPrefs.PinnedBranches = SanitizeStringsList(m_ProjectPrefs.PinnedBranches);
 
 				if (m_ProjectPrefs.BranchesDatabaseScanParameters.Any(sp => !sp.IsValid)) {
-					EditorUtility.DisplayDialog("Branches Database", "Some of the branches scan parameters have invalid data. Please fix it.\n\nBranches Database will be disabled.", "Ok");
+					EditorUtility.DisplayDialog(Tr("prefs.branches_db_dialog.title"), Tr("prefs.branches_db_dialog.invalid"), Tr("common.ok"));
 					m_ProjectPrefs.EnableBranchesDatabase = false;
 				}
 			}
@@ -237,28 +242,38 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		private void DrawPersonalPreferences()
 		{
-			EditorGUILayout.HelpBox("These are personal preferences stored in the registry.\nHint: check the the tooltips.", MessageType.Info);
+			EditorGUILayout.HelpBox(Tr("prefs.personal.help"), MessageType.Info);
 
 			var sp = m_SerializedObject.FindProperty("m_PersonalPrefs");
 
-			m_PersonalPrefs.EnableCoreIntegration = EditorGUILayout.Toggle("Enable SVN integration", m_PersonalPrefs.EnableCoreIntegration);
+			// Language selector — apply immediately so the rest of the window re-localizes on the next OnGUI.
+			EditorGUI.BeginChangeCheck();
+			var newLang = (WiseSVNLanguage)EditorGUILayout.EnumPopup(
+				TrContent("prefs.language", "prefs.language.tooltip"),
+				m_PersonalPrefs.Language);
+			if (EditorGUI.EndChangeCheck() && newLang != m_PersonalPrefs.Language) {
+				m_PersonalPrefs.Language = newLang;
+				LocalizationManager.SetLanguage(newLang);
+			}
+
+			m_PersonalPrefs.EnableCoreIntegration = EditorGUILayout.Toggle(Tr("prefs.enable_svn"), m_PersonalPrefs.EnableCoreIntegration);
 
 			EditorGUI.BeginDisabledGroup(!m_PersonalPrefs.EnableCoreIntegration);
 
-			m_PersonalPrefs.PopulateStatusesDatabase = EditorGUILayout.Toggle(new GUIContent("Enable overlay icons", "Enables overlay icons in the project windows.\nPopulates internal cache with statuses of changed entities.\nFile changes may trigger repopulation of the cache."), m_PersonalPrefs.PopulateStatusesDatabase);
+			m_PersonalPrefs.PopulateStatusesDatabase = EditorGUILayout.Toggle(TrContent("prefs.enable_overlay_icons", "prefs.enable_overlay_icons.tooltip"), m_PersonalPrefs.PopulateStatusesDatabase);
 			if (SVNStatusesDatabase.Instance.DataIsIncomplete) {
 				GUILayout.Label(SVNOverlayIcons.GetDataIsIncompleteWarning());
 			}
 			EditorGUI.BeginDisabledGroup(!m_PersonalPrefs.PopulateStatusesDatabase);
 
-			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(new GUIContent("Scan for svn-ignores", "Enables svn-ignore overlay icons in the project windows. If disabled, svn-ignored items will be considered as Normal status (green icon)."), m_PersonalPrefs.PopulateIgnoresDatabase);
-			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(new GUIContent("Show Normal status green icon", "Normal status is versioned asset that doesn't have any changes."), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
-			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(new GUIContent("Show Ignore & Excluded gray icon", "Show gray icon over the items that are svn-ignored or added in the Exclude list in the Project tab of these preferences. These are non-recursive."), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
-			m_PersonalPrefs.AutoRefreshDatabaseInterval = EditorGUILayout.IntField(new GUIContent("Overlay icons refresh interval", "How much seconds to wait for the next overlay icons refresh.\nNOTE: -1 will deactivate it - only file changes will trigger refresh."), m_PersonalPrefs.AutoRefreshDatabaseInterval);
+			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
+			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
+			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
+			m_PersonalPrefs.AutoRefreshDatabaseInterval = EditorGUILayout.IntField(TrContent("prefs.refresh_interval", "prefs.refresh_interval.tooltip"), m_PersonalPrefs.AutoRefreshDatabaseInterval);
 
 			m_PersonalPrefs.DownloadRepositoryChanges =
 				(SVNPreferencesManager.BoolPreference)EditorGUILayout.EnumPopup(
-					new GUIContent("Check for repository changes", m_DownloadRepositoryChangesHint + "\n\nNOTE: this will override the project preference. Coordinate this with your team.")
+					TrContent("prefs.check_repo_changes", "prefs.check_repo_changes.tooltip")
 					, m_PersonalPrefs.DownloadRepositoryChanges);
 
 			bool downloadChangesEnabled = m_PersonalPrefs.DownloadRepositoryChanges == SVNPreferencesManager.BoolPreference.Enabled ||
@@ -267,7 +282,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			Color prevColor = GUI.color;
 			GUI.color = Color.red;
-			if (SVNPreferencesManager.Instance.NeedsToAuthenticate && GUILayout.Button("Authenticate")) {
+			if (SVNPreferencesManager.Instance.NeedsToAuthenticate && GUILayout.Button(Tr("prefs.authenticate"))) {
 				SVNPreferencesManager.Instance.TryToAuthenticate();
 
 				WiseSVNIntegration.ClearLastDisplayedError();
@@ -277,30 +292,30 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			GUI.color = prevColor;
 
 			EditorGUI.BeginDisabledGroup(!m_ProjectPrefs.EnableLockPrompt);
-			m_PersonalPrefs.AutoLockOnModified = EditorGUILayout.Toggle(new GUIContent("Auto lock when modified", SVNPreferencesManager.PersonalPreferences.AutoLockOnModifiedHint + "\n\nWorks only when lock prompts are enabled in the Project preferences tab."), m_PersonalPrefs.AutoLockOnModified);
+			m_PersonalPrefs.AutoLockOnModified = EditorGUILayout.Toggle(TrContent("prefs.auto_lock_when_modified", "prefs.auto_lock_when_modified.tooltip"), m_PersonalPrefs.AutoLockOnModified);
 			EditorGUI.EndDisabledGroup();
 
 			EditorGUI.BeginDisabledGroup(!downloadChangesEnabled);
-			m_PersonalPrefs.WarnForPotentialConflicts = EditorGUILayout.Toggle(new GUIContent("SceneView overlay for conflicts", "Display warning in the SceneView when the current scene or edited prefab is out of date or locked."), m_PersonalPrefs.WarnForPotentialConflicts);
+			m_PersonalPrefs.WarnForPotentialConflicts = EditorGUILayout.Toggle(TrContent("prefs.sceneview_conflicts", "prefs.sceneview_conflicts.tooltip"), m_PersonalPrefs.WarnForPotentialConflicts);
 			EditorGUI.EndDisabledGroup();
 
 			EditorGUI.EndDisabledGroup();
 
-			m_PersonalPrefs.AskOnMovingFolders = EditorGUILayout.Toggle(new GUIContent("Ask On Moving Folders", "Ask for confirmation when moving folders inside Unity."), m_PersonalPrefs.AskOnMovingFolders);
+			m_PersonalPrefs.AskOnMovingFolders = EditorGUILayout.Toggle(TrContent("prefs.ask_on_moving_folders", "prefs.ask_on_moving_folders.tooltip"), m_PersonalPrefs.AskOnMovingFolders);
 
-			m_PersonalPrefs.SvnCLIPath = EditorGUILayout.TextField(new GUIContent("SVN CLI Path", "Specify SVN CLI (svn.exe) binary path to use or leave empty for the defaults.\n\nNOTE: this will override the project preference. Coordinate this with your team."), m_PersonalPrefs.SvnCLIPath);
+			m_PersonalPrefs.SvnCLIPath = EditorGUILayout.TextField(TrContent("prefs.svn_cli_path", "prefs.svn_cli_path.tooltip"), m_PersonalPrefs.SvnCLIPath);
 
-			m_PersonalPrefs.ContextMenusClient = (ContextMenusClient)EditorGUILayout.EnumPopup(new GUIContent("Context menus client", "Select what client should be used with the context menus."), m_PersonalPrefs.ContextMenusClient);
+			m_PersonalPrefs.ContextMenusClient = (ContextMenusClient)EditorGUILayout.EnumPopup(TrContent("prefs.context_menus_client", "prefs.context_menus_client.tooltip"), m_PersonalPrefs.ContextMenusClient);
 			if (GUI.changed) {
 				var errorMsg = SVNContextMenusManager.IsCurrentlySupported(m_PersonalPrefs.ContextMenusClient);
 				if (!string.IsNullOrEmpty(errorMsg)) {
-					EditorUtility.DisplayDialog("Context Menus Client Issue", errorMsg, "Ok");
+					EditorUtility.DisplayDialog(Tr("prefs.context_menus_client_issue"), errorMsg, Tr("common.ok"));
 				}
 			}
 
-			m_PersonalPrefs.TraceLogs = (SVNTraceLogs)EditorGUILayout.EnumFlagsField(new GUIContent("Trace logs", "Logs for nerds and debugging."), m_PersonalPrefs.TraceLogs);
+			m_PersonalPrefs.TraceLogs = (SVNTraceLogs)EditorGUILayout.EnumFlagsField(TrContent("prefs.trace_logs", "prefs.trace_logs.tooltip"), m_PersonalPrefs.TraceLogs);
 
-			EditorGUILayout.PropertyField(sp.FindPropertyRelative("Exclude"), new GUIContent("Exclude Paths", "Relative path (contains '/') or asset name to be ignored by the SVN integrations. Use with caution.\n\nExample: \"Assets/Scenes/Baked\" or \"_deprecated\""), true);
+			EditorGUILayout.PropertyField(sp.FindPropertyRelative("Exclude"), TrContent("prefs.exclude_paths", "prefs.exclude_paths.tooltip"), true);
 
 			EditorGUI.EndDisabledGroup();
 		}

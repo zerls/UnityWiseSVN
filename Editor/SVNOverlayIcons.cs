@@ -1,10 +1,13 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
+using DevLocker.VersionControl.WiseSVN.Localization;
 using DevLocker.VersionControl.WiseSVN.Preferences;
 using System;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN
 {
@@ -56,7 +59,7 @@ namespace DevLocker.VersionControl.WiseSVN
 		public static void InvalidateDatabaseMenu()
 		{
 			if (!SVNPreferencesManager.Instance.PersonalPrefs.EnableCoreIntegration || !SVNPreferencesManager.Instance.PersonalPrefs.PopulateStatusesDatabase) {
-				EditorUtility.DisplayDialog("Integration Disabled", "Can't refresh the icons as the WiseSVN integration is disabled. Check in the WiseSVN preferences.", "Ok");
+				EditorUtility.DisplayDialog(Tr("overlay.integration_disabled.title"), Tr("overlay.integration_disabled.msg"), Tr("common.ok"));
 				return;
 			}
 
@@ -72,7 +75,7 @@ namespace DevLocker.VersionControl.WiseSVN
 				m_RefreshProgressId = null;
 			}
 
-			m_RefreshProgressId = Progress.Start("SVN Refresh", $"Checking all svn statuses...", Progress.Options.Indefinite);
+			m_RefreshProgressId = Progress.Start(Tr("overlay.refresh.title"), Tr("overlay.refresh.msg"), Progress.Options.Indefinite);
 			EditorApplication.update += UpdateDatabaseRefreshProgress;
 		}
 
@@ -99,9 +102,7 @@ namespace DevLocker.VersionControl.WiseSVN
 		internal static GUIContent GetDataIsIncompleteWarning()
 		{
 			if (m_DataIsIncompleteWarning == null) {
-				string warningTooltip = "Some or all SVN overlay icons are skipped as you have too many changes to display.\n" +
-					"If you have a lot of unversioned files consider adding them to a svn ignore list.\n" +
-					"If the server repository has a lot of changes, consider updating.";
+				string warningTooltip = Tr("overlay.data_incomplete.tooltip");
 
 				m_DataIsIncompleteWarning = EditorGUIUtility.IconContent("console.warnicon.sml");
 				m_DataIsIncompleteWarning.tooltip = warningTooltip;
@@ -197,13 +198,14 @@ namespace DevLocker.VersionControl.WiseSVN
 									dateStr = date.ToString("yyyy-MM-dd hh:mm:ss");
 								}
 							}
-							details += $"File: {System.IO.Path.GetFileName(knownStatusData.Path)}\n" +
-							          $"Lock Status: {ObjectNames.NicifyVariableName(knownStatusData.LockStatus.ToString())}\n" +
-							          $"Owner: {knownStatusData.LockDetails.Owner}\n" +
-							          $"Date: {dateStr}\n" +
-							          $"Message:\n{knownStatusData.LockDetails.Message}\n";
+							details += Tr("overlay.lockdetails.msg",
+								System.IO.Path.GetFileName(knownStatusData.Path),
+								ObjectNames.NicifyVariableName(knownStatusData.LockStatus.ToString()),
+								knownStatusData.LockDetails.Owner,
+								dateStr,
+								knownStatusData.LockDetails.Message) + "\n";
 						}
-						EditorUtility.DisplayDialog("SVN Lock Details", details.TrimEnd('\n'), "Ok");
+						EditorUtility.DisplayDialog(Tr("overlay.lockdetails.title"), details.TrimEnd('\n'), Tr("common.ok"));
 					}
 				}
 			}
