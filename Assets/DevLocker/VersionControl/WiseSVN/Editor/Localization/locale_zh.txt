@@ -41,6 +41,8 @@ prefs.save_changes=保存修改：
 prefs.enable_svn=启用 SVN 集成
 prefs.enable_overlay_icons=启用覆盖图标
 prefs.enable_overlay_icons.tooltip=在 Project 窗口中显示 SVN 状态覆盖图标。\n会维护一份变更实体的状态缓存。\n文件变更可能触发缓存重建。
+prefs.icon_style=图标风格
+prefs.icon_style.tooltip=经典风格使用原始 TortoiseSVN 样式的 PNG 图标。\n现代风格使用 Unity 内置编辑器图标，自动适应当前主题颜色。
 prefs.scan_svn_ignores=扫描 svn-ignore
 prefs.scan_svn_ignores.tooltip=启用 svn-ignore 覆盖图标。若关闭，svn 已忽略项将被视为 Normal 状态（绿色图标）。
 prefs.show_normal_icon=显示 Normal 状态绿色图标
@@ -213,6 +215,15 @@ cli.assets_auto_refresh_disabled=资源自动刷新已禁用！
 cli.clear_output=清空输出
 cli.copy_output=复制输出
 cli.run=运行
+
+# ========== SVN 状态栏覆盖层（Scene 视图） ==========
+overlay.svnstatus.disabled=SVN 已禁用
+overlay.svnstatus.modified=已改
+overlay.svnstatus.remote=远端
+overlay.svnstatus.menu.update_all=更新全部
+overlay.svnstatus.menu.commit_all=提交全部
+overlay.svnstatus.menu.refresh=刷新图标
+overlay.svnstatus.menu.refresh_branch=刷新分支名
 
 # ========== Scene 视图覆盖警告 ==========
 sceneview.scene_outofdate=Scene "{0}" 在 SVN 中已过期！

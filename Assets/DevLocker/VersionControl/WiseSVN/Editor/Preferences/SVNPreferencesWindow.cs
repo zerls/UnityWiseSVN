@@ -273,6 +273,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			}
 			EditorGUI.BeginDisabledGroup(!m_PersonalPrefs.PopulateStatusesDatabase);
 
+			m_PersonalPrefs.IconStyle = (WiseSVNIconStyle) EditorGUILayout.EnumPopup(
+				TrContent("prefs.icon_style", "prefs.icon_style.tooltip"), m_PersonalPrefs.IconStyle);
+
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
 			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
 			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
