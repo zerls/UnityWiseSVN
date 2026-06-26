@@ -2,6 +2,8 @@
 
 # WiseSVN For Unity
 
+> **Fork** of [NibbleByte/UnityWiseSVN](https://github.com/NibbleByte/UnityWiseSVN) with **Chinese/English i18n**, **SVN Ignore Manager**, and modern enhancements.
+
 Simple but powerful SVN Integration for Unity 3D utilizing [TortoiseSVN](https://tortoisesvn.net/) (for Windows), [SnailSVN](https://langui.net/snailsvn) (for MacOS) or [RabbitVCS](http://rabbitvcs.org/) (for Linux) user interface. A must have plugin if you use SVN as your version control system in your project.
 
 [Assets Store](https://assetstore.unity.com/packages/tools/version-control/wise-svn-162636) | [Unity Forum](https://forum.unity.com/threads/wise-svn-powerful-tortoisesvn-snailsvn-integration.844168/) | [Reddit](https://www.reddit.com/r/Unity3D/comments/fgjovk/finally_a_fully_working_tortoisesvn_snailsvn/)
@@ -13,6 +15,7 @@ Simple but powerful SVN Integration for Unity 3D utilizing [TortoiseSVN](https:/
 [Usage](#usage)<br />
 [Installation](#installation)<br />
 [Overlay Icons](#overlay-icons)<br />
+[Documentation](#documentation)<br />
 [Screenshots](#screenshots)<br />
 
 ## Features
@@ -79,7 +82,7 @@ openupm add devlocker.versioncontrol.wisesvn
         }
     ],
     "dependencies": {
-        "devlocker.versioncontrol.wisesvn": "1.4.XXXXX"
+        "devlocker.versioncontrol.wisesvn": "1.6.0"
     }
 }
 ```
@@ -110,6 +113,13 @@ openupm add devlocker.versioncontrol.wisesvn
 * Locked by me <img src="./Assets/DevLocker/VersionControl/WiseSVN/Editor/Resources/SVNOverlayIcons/Locks/SVNLockedHereIcon.png" width="16">
 * Locked by others <img src="./Assets/DevLocker/VersionControl/WiseSVN/Editor/Resources/SVNOverlayIcons/Locks/SVNLockedOtherIcon.png" width="16">
 * Server has changes, update <img src="./Assets/DevLocker/VersionControl/WiseSVN/Editor/Resources/SVNOverlayIcons/Others/SVNRemoteChangesIcon.png" width="16">
+
+## Documentation
+
+* [Changelog](Docs/CHANGELOG.md)
+* [用户指南（中文）](Docs/UserGuide_CN.md)
+* [User Guide (English)](Docs/UserGuide_EN.md)
+* [Developer Guide](Docs/Developer_Guide.md)
 
 ## Screenshots
 ![OverlayIcons1](Docs/Screenshots/WiseSVN-OverlayIcons-Shot.png)

@@ -1,0 +1,277 @@
+# WiseSVN English locale (fallback). UTF-8.
+# Format: key=value   (use \n for line break, \" for quote, # for comment line)
+
+# ========== Common ==========
+common.ok=OK
+common.cancel=Cancel
+common.yes=Yes
+common.no=No
+common.close=Close
+common.save_all=Save All
+common.refresh=Refresh
+common.add=Add
+common.remove=Remove
+common.apply=Apply
+common.unknown=Unknown
+common.scanning=Scanning...
+common.working=Working...
+common.aborting=Aborting...
+common.aborted=Aborted!
+common.completed=Completed!
+common.failed=Failed!
+common.error=Error
+
+# ========== Language Selector ==========
+prefs.language=Language
+prefs.language.tooltip=Display language for WiseSVN UI. 'Auto' follows Unity's system language.
+prefs.language.auto=Auto (System)
+prefs.language.english=English
+prefs.language.chinese_simplified=简体中文 (Simplified Chinese)
+
+# ========== Preferences Window ==========
+prefs.window.title=Wise SVN Preferences
+prefs.tab.personal=Personal
+prefs.tab.project=Project
+prefs.tab.about=About
+
+prefs.personal.help=These are personal preferences stored in the registry.\nHint: check the tooltips.
+prefs.project.help=These settings will be saved in the ProjectSettings folder.\nFeel free to add them to your version control system.\nCoordinate any changes here with your team.
+
+prefs.save_changes=Save changes:
+prefs.enable_svn=Enable SVN integration
+prefs.enable_overlay_icons=Enable overlay icons
+prefs.enable_overlay_icons.tooltip=Enables overlay icons in the project windows.\nPopulates internal cache with statuses of changed entities.\nFile changes may trigger repopulation of the cache.
+prefs.scan_svn_ignores=Scan for svn-ignores
+prefs.scan_svn_ignores.tooltip=Enables svn-ignore overlay icons in the project windows. If disabled, svn-ignored items will be considered as Normal status (green icon).
+prefs.show_normal_icon=Show Normal status green icon
+prefs.show_normal_icon.tooltip=Normal status is a versioned asset that doesn't have any changes.
+prefs.show_excluded_icon=Show Ignore & Excluded gray icon
+prefs.show_excluded_icon.tooltip=Show gray icon over the items that are svn-ignored or added in the Exclude list. These are non-recursive.
+prefs.refresh_interval=Overlay icons refresh interval
+prefs.refresh_interval.tooltip=How many seconds to wait for the next overlay icons refresh.\nNOTE: -1 will deactivate it — only file changes will trigger refresh.
+prefs.check_repo_changes=Check for repository changes
+prefs.check_repo_changes.tooltip=Work online — will ask the repository if there are any changes on the server.\nEnabling this will show locks and out-of-date additional icons.\nRefreshes might be slower due to network communication, but shouldn't slow down your editor.\n\nNOTE: this will override the project preference. Coordinate this with your team.
+prefs.authenticate=Authenticate
+prefs.auto_lock_when_modified=Auto lock when modified
+prefs.auto_lock_when_modified.tooltip=Will automatically lock assets if possible when they become modified, instead of prompting the user.\nIf assets have newer version or are locked by someone else, prompt will still be displayed.\n\nWorks only when lock prompts are enabled in the Project preferences tab.
+prefs.sceneview_conflicts=SceneView overlay for conflicts
+prefs.sceneview_conflicts.tooltip=Display warning in the SceneView when the current scene or edited prefab is out of date or locked.
+prefs.ask_on_moving_folders=Ask On Moving Folders
+prefs.ask_on_moving_folders.tooltip=Ask for confirmation when moving folders inside Unity.
+prefs.svn_cli_path=SVN CLI Path
+prefs.svn_cli_path.tooltip=Specify SVN CLI (svn.exe) binary path to use, or leave empty for defaults.\n\nNOTE: this will override the project preference. Coordinate this with your team.
+prefs.svn_cli_path_macos=SVN CLI Path MacOS
+prefs.svn_cli_path_macos.tooltip=Same as above, but for MacOS.
+prefs.context_menus_client=Context menus client
+prefs.context_menus_client.tooltip=Select what client should be used with the context menus.
+prefs.context_menus_client_issue=Context Menus Client Issue
+prefs.trace_logs=Trace logs
+prefs.trace_logs.tooltip=Logs for nerds and debugging.
+prefs.exclude_paths=Exclude Paths
+prefs.exclude_paths.tooltip=Relative path (contains '/') or asset name to be ignored by the SVN integrations. Use with caution.\n\nExample: \"Assets/Scenes/Baked\" or \"_deprecated\"
+
+prefs.assets_move_behaviour=Assets move behaviour
+prefs.assets_move_behaviour.tooltip=Depending on your SVN repository, sometimes you may need to execute move commands as simple add and remove operations, losing their history. Use with caution.
+prefs.lockprompt_require_overlay=Lock prompts require enabled overlay icons support from the Personal preferences!
+prefs.enable_lock_prompts=Enable Lock Prompts
+prefs.enable_lock_prompts.tooltip=Prompt user to lock assets when it or its meta becomes modified.
+prefs.lockprompt_hint_title=Lock Prompt Hint:
+prefs.lockprompt_hint=If asset or its meta becomes modified, a pop-up window will prompt the user to lock or ignore it.\nIt shows if modified assets are locked by others or out of date, which prevents locking them.\nIf left unlocked, the window won't prompt again for those assets.\nOn editor startup, user will be prompted again for all modified unlocked assets.\n\nDescribe below what asset folders and asset types should be monitored for locking.\nTo monitor the whole project, type in \"Assets\" for TargetFolder.\nCoordinate this with your team and commit the preference.\nMust have at least one entry to work properly.
+prefs.lock_message=Lock Message
+
+prefs.branches_db_hint_title=Branches Database Hint:
+prefs.enable_branches_db=Enable Branches Database
+prefs.enable_branches_db.tooltip=Scans the SVN repository for Unity projects in branches and keeps them in a simple database.\n\nSingle scan may take up to a few minutes, depending on your network connection and the complexity of your repository.
+prefs.branches_scan_params=Branches Scan Parameters
+prefs.branches_scan_params.tooltip=Must have at least one entry to work properly.
+prefs.pinned_branches=Pinned Branches
+prefs.pinned_branches.tooltip=Pin these branches at the top.
+
+prefs.version=Version: {0}
+prefs.help=Help:
+prefs.documentation=Documentation
+prefs.documentation_missing.title=Documentation missing!
+prefs.documentation_missing.message=The documentation you requested is missing.
+prefs.copy_report_data=Copy Report Data to Clipboard
+prefs.about=About:
+prefs.created_by=Created by Filip Slavov
+prefs.in_collaboration=In collaboration with Snapshot Games
+prefs.fork_note=Fork enhanced with i18n and Ignore Manager.
+prefs.asset_store=Asset Store
+prefs.github=GitHub
+prefs.unity_forum=Unity Forum
+prefs.reddit=Reddit
+prefs.openupm=OpenUPM
+prefs.icons_credit=Icons taken from TortoiseSVN (created by Lübbe Onken)
+prefs.random_video=Random Video:
+prefs.random_video.hint=This plugin took a lot of time to make.\nHere are some random videos worth spreading that distracted me along the way. :D
+prefs.next_video=Next Video
+
+prefs.svn_binary_missing.title=SVN Binary Missing
+prefs.svn_binary_missing.message=Cannot find the \"svn\" executable specified in the svn preferences:\n\"{0}\"
+prefs.lockprompt_dialog.title=Lock Prompt
+prefs.lockprompt_dialog.need_entry=In order to use lock prompts, you must provide at least one lock prompt parameters element.\n\nLock Prompt will be disabled.
+prefs.lockprompt_dialog.invalid=Some of the lock prompt parameters have invalid data. Please fix it.\n\nLock Prompt will be disabled.
+prefs.branches_db_dialog.title=Branches Database
+prefs.branches_db_dialog.need_entry=In order to use Branches Database, you must provide at least one scan parameters element.\n\nBranches Database will be disabled.
+prefs.branches_db_dialog.invalid=Some of the branches scan parameters have invalid data. Please fix it.\n\nBranches Database will be disabled.
+prefs.svn_authenticate.title=SVN Authenticate
+prefs.svn_authenticate.message=This process will open a terminal window and start an online request to your SVN repository. It will ask you to authenticate.\n\nThis is part of the SVN CLI process. WiseSVN doesn't know or store your username and password.
+prefs.svn_authenticate.proceed=Proceed
+
+prefs.ignore_manager_button=Open Ignore Manager
+
+# ========== Lock Prompt Window ==========
+lockprompt.window.title=SVN Lock Modified Assets
+lockprompt.auto_locking_notification=Auto-Locking {0} Assets in SVN
+lockprompt.header=Lock Modified Assets
+lockprompt.silence=Silence!
+lockprompt.silence.tooltip=Suppress all lock prompts and auto-lock actions until Unity is restarted or by selecting \"{0}\"
+lockprompt.silence.confirm_title=Silence Lock Prompts?
+lockprompt.silence.confirm_msg={0}\n\nUseful if you want to test stuff locally without committing later.\n\nAre you sure?
+lockprompt.what_are_locks=What are locks?
+lockprompt.what_are_locks.help=In a large team, two or more people may be working on the same files simultaneously, unaware of each other.\nThe first one to commit their changes to the repository server has their work \"saved\".\nAnyone else trying to commit later on will have to deal with any resulting conflicts.\nThis may lead to lost work. To avoid this, when starting work on a file, one can \"lock\" that file on the server.\nThis indicates to everyone else that someone is working on that file.
+lockprompt.steal_locks=Steal locks by force
+lockprompt.what_is_steal=What is \"Steal locks by force\"?
+lockprompt.what_is_steal.help=These assets have local changes and are all locked by someone else. You can steal their lock by force.\nThey are probably working on these assets and by committing your changes you risk others having conflicts in the future.\n\nCoordinate with the locks' owners and select which assets you want to lock by force.
+lockprompt.auto_lock=Auto lock when possible
+lockprompt.auto_lock.tooltip_extra=\n\nCan be changed in the SVN Preferences window.
+lockprompt.skip_help=If you skip locking assets, you won't be prompted again unless the assets' status changes or Unity restarts.\nTo force re-evaluate all locks, select the \"{0}\" menu.
+lockprompt.col.lock=Lock
+lockprompt.col.asset=Asset
+lockprompt.col.revert=Revert
+lockprompt.col.owner=Owner
+lockprompt.scanning=Scanning for changes...
+lockprompt.out_of_date=Out of date!
+lockprompt.out_of_date.tooltip=Can't lock because the server repository has newer changes. You need to update.
+lockprompt.revert_asset=Revert asset
+lockprompt.check_changes=Check changes
+lockprompt.btn.toggle_selected=Toggle Selected
+lockprompt.btn.refresh_all=Refresh All
+lockprompt.btn.update_all=Update All
+lockprompt.btn.revert_all_window=Revert All Window
+lockprompt.btn.skip_all=Skip All
+lockprompt.btn.lock_or_steal_selected=Lock OR STEAL Selected
+lockprompt.btn.lock_selected=Lock Selected
+lockprompt.deleted=deleted
+lockprompt.meta=meta
+lockprompt.moved_to_tooltip=Moved to...
+
+# ========== Branch Selector Window ==========
+branches.window.title=Branch Selector
+branches.menu_path=Assets/SVN/Branch Selector
+branches.refresh.tooltip=Refresh branches cache database.\n\nNOTE: A single scan may take up to a few minutes, depending on your network connection and the complexity of your repository.
+branches.asset_label=Asset:
+branches.search_label=Search:
+branches.setup_required=To use Branch Selector, you must enable and set up\n\"Branches Database\" in the Project preferences...
+branches.open_project_prefs=Open Project Preferences
+branches.scanning=Scanning branches for Unity projects...
+branches.select_target=Please select target asset...
+branches.conflicts_label=Conflicts:
+branches.show_non_conflicts=Show Non-Conflicts:
+branches.limit_by=Limit by:
+branches.start_scan=Start Scan
+branches.stop_scan=Stop Scan
+branches.scan_revisions.tooltip=Scan a number of revisions back from the last changed one in the checked branch.
+branches.show_log.tooltip=Show Log in this branch at the target asset.
+branches.repo_browser.tooltip=Repo-Browser in this branch at the target asset.
+branches.switch.tooltip=Switch working copy to another branch.\nOpens TortoiseSVN dialog.
+branches.scan_conflicts.tooltip=Scan all branches for potential conflicts.\nThis will look for any changes made to the target asset in the branches.
+branches.conflicts.pending=Pending — waiting to be scanned for conflicts.
+branches.conflicts.found=The target asset was modified in this branch — potential conflicts.
+branches.conflicts.normal=No conflicts were found by the scan.
+branches.conflicts.added=Asset was added in this branch.
+branches.conflicts.missing=Asset was missing. It may have been deleted or never existed in this branch.
+branches.conflicts.error=Error while scanning this branch. Check the console logs for more info.
+branches.error_scanning=Error scanning branches: {0}
+branches.count={0} branches
+branches.switch_op.title=Switch Operation
+branches.switch_op.msg=Unity needs to be closed while switching. Do you want to close it?\n\nReason: if Unity starts crunching assets while SVN is downloading files, the Library may get corrupted.
+branches.switch_op.yes=Yes!
+branches.switch_what.title=Switch what?
+branches.switch_what.msg=What do you want to switch?\n- Working copy root (the whole checkout)\n- Unity project folder
+branches.switch_what.wc_root=Working copy root
+branches.switch_what.unity_project=Unity project
+
+# ========== CLI Context Window ==========
+cli.window.title=SVN CLI Window
+cli.command=Command
+cli.output=Output:
+cli.abort=Abort
+cli.kill=Kill
+cli.killing=Killing...
+cli.assets_auto_refresh_disabled=Assets Auto Refresh Disabled!
+cli.clear_output=Clear Output
+cli.copy_output=Copy Output
+cli.run=Run
+
+# ========== SVN Locked Overlay (SceneView) ==========
+sceneview.scene_outofdate=Scene \"{0}\" is out of date in SVN!
+sceneview.scene_locked=Scene \"{0}\" is locked by {1} in SVN!
+sceneview.scene_lockbroken=Scene \"{0}\" lock is broken in SVN!
+sceneview.prefab_outofdate=Prefab \"{0}\" is out of date in SVN!
+sceneview.prefab_locked=Prefab \"{0}\" is locked by {1} in SVN!
+sceneview.prefab_lockbroken=Prefab \"{0}\" lock is broken in SVN!
+
+# ========== Overlay Icons (project window) ==========
+overlay.integration_disabled.title=Integration Disabled
+overlay.integration_disabled.msg=Can't refresh the icons as the WiseSVN integration is disabled. Check in the WiseSVN preferences.
+overlay.refresh.title=SVN Refresh
+overlay.refresh.msg=Checking all svn statuses...
+overlay.data_incomplete.tooltip=Some or all SVN overlay icons are skipped as you have too many changes to display.\nIf you have a lot of unversioned files, consider adding them to a svn ignore list.\nIf the server repository has a lot of changes, consider updating.
+overlay.lockdetails.title=SVN Lock Details
+overlay.lockdetails.msg=File: {0}\nLock Status: {1}\nOwner: {2}\nDate: {3}\nMessage:\n{4}
+
+overlay.tooltip.ignored=This item is in a svn-ignore list. It is not tracked by SVN.
+overlay.tooltip.excluded=This item is excluded from monitoring by WiseSVN, but it may still be tracked by SVN. Check the WiseSVN preferences - Excludes setting.
+overlay.tooltip.locked_here=You have locked this file.\nClick for more details.
+overlay.tooltip.broken_lock=You have a lock that is no longer valid (someone else stole it and released it).\nClick for more details.
+overlay.tooltip.locked_other=Someone else locked this file.\nClick for more details.
+overlay.tooltip.locked_stolen=Your lock was stolen by someone else.\nClick for more details.
+overlay.tooltip.remote_changes=Asset is out of date. Update to avoid conflicts.
+
+# ========== Ignore Manager Window ==========
+ignoremgr.window.title=SVN Ignore Manager
+ignoremgr.menu_path=Assets/SVN/Ignore Manager
+ignoremgr.toolbar.refresh=Refresh
+ignoremgr.toolbar.refresh.tooltip=Reload directories that have svn:ignore properties set.
+ignoremgr.toolbar.apply=Apply Changes
+ignoremgr.toolbar.apply.tooltip=Write all pending pattern changes back to SVN.
+ignoremgr.toolbar.path=Path:
+ignoremgr.left_header=Directories with svn:ignore
+ignoremgr.empty_left=No svn:ignore properties found.\nSelect a folder in the Project window and click \"+\" below to start managing patterns for it.
+ignoremgr.add_directory=Add the selected Project window folder to manage.
+ignoremgr.right_no_dir=Select a directory on the left to view its patterns.
+ignoremgr.section.local=svn:ignore (this directory only)
+ignoremgr.section.global=svn:global-ignores (recursive, read-only here)
+ignoremgr.add_pattern_placeholder=New pattern (e.g. *.tmp)
+ignoremgr.add_pattern_btn=Add
+ignoremgr.remove_pattern_tooltip=Remove this pattern.
+ignoremgr.global_readonly_note=Global ignores are only edited at the working-copy root or via TortoiseSVN. Patterns shown here are read-only.
+ignoremgr.status.summary={0} pattern(s) across {1} directory(ies).
+ignoremgr.unsaved_changes.title=Unsaved Changes
+ignoremgr.unsaved_changes.msg=You have pending pattern changes. Apply them now?
+ignoremgr.apply_success=Ignore patterns updated successfully.
+ignoremgr.apply_failed=Failed to update ignore patterns. Check the console logs.
+ignoremgr.versioned_warn.title=Pattern Targets Versioned File
+ignoremgr.versioned_warn.msg=The pattern \"{0}\" matches a file that is already versioned. SVN ignores only apply to unversioned files. The pattern will be added, but you may also need to mark the file deleted in SVN to fully ignore it.
+
+# ========== Context Menus / IgnoreToggle dialog ==========
+ctxmenu.ignore_versioned.title=Ignore Versioned File
+ctxmenu.ignore_versioned.msg=Only unversioned files can be ignored, but the selected file is versioned (committed). You can:\n1. Add it to the \"ignore-on-commit\" changelist. TortoiseSVN will ignore it by default on commit.\n2. Mark the file as deleted in svn (without removing it from disk) and ignore it for everybody. You need to commit resulting changes.\n\n\"{0}\"
+ctxmenu.ignore_versioned.add_changelist=Add to \"ignore-on-commit\"
+ctxmenu.ignore_versioned.mark_delete=Mark file for deletion && ignore
+
+ctxmenu.revert_file.title=Revert File?
+ctxmenu.revert_file.msg=Are you sure you want to revert this file and its meta?\n\"{0}\"
+
+# ========== Errors / Generic dialogs ==========
+dialog.error.title=Error
+dialog.error.write_failed=Failed to write file:\n\"{0}\"\n\nData not saved! Check the logs for more info.
+dialog.not_supported.title=Not Supported
+dialog.snail_resolve_all=Sorry, resolve all functionality is currently not supported by SnailSVN.
+dialog.snail_resolve=Sorry, resolve functionality is currently not supported by SnailSVN.
+dialog.rabbit_resolve_all=RabbitSVN does not support Resolve All yet.
+dialog.rabbit_resolve=RabbitSVN does not support Resolve yet.
+dialog.partial_branching.title=SVN Partial Branching
+dialog.partial_branching.msg=Project has some files coming from a different branch. This is most likely a mistake.\n\nWhen switching between branches always do it from the top folder of the checkout and select \"Fully recursive\"!

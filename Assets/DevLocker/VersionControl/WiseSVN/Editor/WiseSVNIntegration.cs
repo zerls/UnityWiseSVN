@@ -1593,6 +1593,52 @@ namespace DevLocker.VersionControl.WiseSVN
 		}
 
 		/// <summary>
+		/// Async wrapper around <see cref="Propset"/>.
+		/// </summary>
+		public static SVNAsyncOperation<PropOperationResult> PropsetAsync(string assetPath, string property, string valueOverride, bool recursive = false, int timeout = -1)
+		{
+			return SVNAsyncOperation<PropOperationResult>.Start(op => Propset(assetPath, property, valueOverride, recursive, timeout, op));
+		}
+
+		/// <summary>
+		/// Performs propdel operation: removes the named property from the path entirely.
+		/// Example property names: "svn:ignore", "svn:mergeinfo".
+		/// Returns Success if the property was removed OR was not present.
+		/// </summary>
+		public static PropOperationResult Propdel(string assetPath, string property, bool recursive = false, int timeout = COMMAND_TIMEOUT, IShellMonitor shellMonitor = null)
+		{
+			var depth = recursive ? "infinity" : "empty";
+
+			var result = ShellUtils.ExecuteCommand(SVN_Command, $"propdel \"{property}\" --depth={depth} \"{SVNFormatPath(assetPath)}\"", timeout, shellMonitor);
+
+			if (result.HasErrors) {
+
+				// URL or local path not found (or invalid working copy path).
+				if (result.Error.Contains("E155010") || result.Error.Contains("W155010") || result.Error.Contains("E155007") || result.Error.Contains("W160013") || result.Error.Contains("E200009") || result.Error.Contains("E200005"))
+					return PropOperationResult.NotFound;
+
+				// Property is not present — treat as success since the desired state (no property) is achieved.
+				if (result.Error.Contains("W200017"))
+					return PropOperationResult.Success;
+
+				if (result.Error.Contains(ShellUtils.TIME_OUT_ERROR_TOKEN))
+					return PropOperationResult.Timeout;
+
+				return PropOperationResult.UnknownError;
+			}
+
+			return PropOperationResult.Success;
+		}
+
+		/// <summary>
+		/// Async wrapper around <see cref="Propdel"/>.
+		/// </summary>
+		public static SVNAsyncOperation<PropOperationResult> PropdelAsync(string assetPath, string property, bool recursive = false, int timeout = -1)
+		{
+			return SVNAsyncOperation<PropOperationResult>.Start(op => Propdel(assetPath, property, recursive, timeout, op));
+		}
+
+		/// <summary>
 		/// Associate changelist <paramref name="changelistName"/> with the <paramref name="assetPath"/>.
 		/// </summary>
 		public static ChangelistOperationResult ChangelistAdd(string assetPath, string changelistName, bool recursive = false, IShellMonitor shellMonitor = null)

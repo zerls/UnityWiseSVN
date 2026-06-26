@@ -3,11 +3,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using DevLocker.VersionControl.WiseSVN.Localization;
 using DevLocker.VersionControl.WiseSVN.Preferences;
 using DevLocker.VersionControl.WiseSVN.Utils;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN
 {
@@ -152,15 +155,15 @@ namespace DevLocker.VersionControl.WiseSVN
 				var statusData = SVNStatusesDatabase.Instance.GetKnownStatusData(guid);
 
 				if (statusData.RemoteStatus != VCRemoteFileStatus.None) {
-					m_SceneMessage += $"Scene \"{scene.name}\" is out of date in SVN!\n";
+					m_SceneMessage += Tr("sceneview.scene_outofdate", scene.name) + "\n";
 					m_SceneMessageIcon = SVNPreferencesManager.Instance.GetRemoteStatusIconContent(VCRemoteFileStatus.Modified);
 
 				} else if (statusData.LockStatus == VCLockStatus.LockedOther || statusData.LockStatus == VCLockStatus.LockedButStolen) {
-					m_SceneMessage += $"Scene \"{scene.name}\" is locked by {statusData.LockDetails.Owner} in SVN!\n";
+					m_SceneMessage += Tr("sceneview.scene_locked", scene.name, statusData.LockDetails.Owner) + "\n";
 					m_SceneMessageIcon = SVNPreferencesManager.Instance.GetLockStatusIconContent(VCLockStatus.LockedOther);
 
 				} else if (statusData.LockStatus == VCLockStatus.BrokenLock) {
-					m_SceneMessage += $"Scene \"{scene.name}\" lock is broken in SVN!\n";
+					m_SceneMessage += Tr("sceneview.scene_lockbroken", scene.name) + "\n";
 					m_SceneMessageIcon = SVNPreferencesManager.Instance.GetLockStatusIconContent(VCLockStatus.BrokenLock);
 				}
 
@@ -216,15 +219,15 @@ namespace DevLocker.VersionControl.WiseSVN
 				var statusData = SVNStatusesDatabase.Instance.GetKnownStatusData(guid);
 
 				if (statusData.RemoteStatus != VCRemoteFileStatus.None) {
-					m_PrefabMessage = $"Prefab \"{Path.GetFileNameWithoutExtension(prefabPath)}\" is out of date in SVN!";
+					m_PrefabMessage = Tr("sceneview.prefab_outofdate", Path.GetFileNameWithoutExtension(prefabPath));
 					m_PrefabMessageIcon = SVNPreferencesManager.Instance.GetRemoteStatusIconContent(VCRemoteFileStatus.Modified);
 
 				} else if (statusData.LockStatus == VCLockStatus.LockedOther || statusData.LockStatus == VCLockStatus.LockedButStolen) {
-					m_PrefabMessage = $"Prefab \"{Path.GetFileNameWithoutExtension(prefabPath)}\" is locked by {statusData.LockDetails.Owner} in SVN!";
+					m_PrefabMessage = Tr("sceneview.prefab_locked", Path.GetFileNameWithoutExtension(prefabPath), statusData.LockDetails.Owner);
 					m_PrefabMessageIcon = SVNPreferencesManager.Instance.GetLockStatusIconContent(VCLockStatus.LockedOther);
 
 				} else if (statusData.LockStatus == VCLockStatus.BrokenLock) {
-					m_PrefabMessage = $"Prefab \"{Path.GetFileNameWithoutExtension(prefabPath)}\" lock is broken in SVN!";
+					m_PrefabMessage = Tr("sceneview.prefab_lockbroken", Path.GetFileNameWithoutExtension(prefabPath));
 					m_PrefabMessageIcon = SVNPreferencesManager.Instance.GetLockStatusIconContent(VCLockStatus.BrokenLock);
 				}
 

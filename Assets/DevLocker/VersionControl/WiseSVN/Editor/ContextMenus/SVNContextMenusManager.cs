@@ -1,11 +1,15 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
 using DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation;
+using DevLocker.VersionControl.WiseSVN.Ignore;
+using DevLocker.VersionControl.WiseSVN.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 {
@@ -511,9 +515,8 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.Blame(assetPath, wait);
 		}
 
-		// Feature is working, but menu is commented out so it doesn't clutter the interface.
-		// Uncomment next line if you really want to do svn ignores in Unity.
-		//[MenuItem("Assets/SVN/\u26D4  Ignore Toggle", false, MenuItemPriorityStart + 108)]
+		// Enabled in 1.6.0: per-asset svn:ignore toggle. Use Ignore Manager (Assets/SVN/Ignore Manager) for batch editing.
+		[MenuItem("Assets/SVN/\u26D4  Ignore Toggle", false, MenuItemPriorityStart + 108)]
 		public static void IgnoreToggleSelected()
 		{
 			IgnoreToggle(GetSelectedAssetPaths().FirstOrDefault());
@@ -558,12 +561,12 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 					isVersioned |= statusDataMeta.Status != VCFileStatus.Unversioned && statusDataMeta.Status != VCFileStatus.Deleted;
 
 					if (isVersioned) {
-						int choice = EditorUtility.DisplayDialogComplex("Ignore Versioned File",
-							$"Only unversioned files can be ignored, but selected file is versioned (committed). You can:\n" +
-							$"1. Add it to \"ignore-on-commit\" changelist. TortoiseSVN will ignore it by default on commit.\n" +
-							$"2. Mark the file as deleted in svn (without removing it from disk) and ignore it for everybody. You need to commit resulting changes.\n" +
-							$"\n\"{assetPath}\"",
-							"Add to \"ignore-on-commit\"", "Cancel", "Mark file for deletion && ignore"
+						int choice = EditorUtility.DisplayDialogComplex(
+							Tr("ctxmenu.ignore_versioned.title"),
+							Tr("ctxmenu.ignore_versioned.msg", assetPath),
+							Tr("ctxmenu.ignore_versioned.add_changelist"),
+							Tr("common.cancel"),
+							Tr("ctxmenu.ignore_versioned.mark_delete")
 							);
 
 						switch(choice) {
@@ -595,6 +598,12 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		}
 
 
+
+		[MenuItem("Assets/SVN/\U0001F4CB  Ignore Manager", false, MenuItemPriorityStart + 109)]
+		public static void ShowIgnoreManager()
+		{
+			SVNIgnoreManagerWindow.Open();
+		}
 
 		[MenuItem("Assets/SVN/\U0001F9F9  Cleanup", false, MenuItemPriorityStart + 110)]
 		public static void Cleanup()

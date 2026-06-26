@@ -1,6 +1,7 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
+using DevLocker.VersionControl.WiseSVN.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -50,6 +51,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public int AutoRefreshDatabaseInterval = 60;    // seconds; Less than 0 will disable it.
 			public ContextMenusClient ContextMenusClient = ContextMenusClient.TortoiseSVN;
 			public SVNTraceLogs TraceLogs = SVNTraceLogs.SVNOperations;
+
+			// UI display language. Auto follows Unity's Application.systemLanguage.
+			public WiseSVNLanguage Language = WiseSVNLanguage.Auto;
 
 #if UNITY_2020_2_OR_NEWER
 			[NonReorderable]
@@ -195,6 +199,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 					EditorApplication.update += reloadTextures;
 				}
 
+				LocalizationManager.OnLanguageChanged -= LoadTextures;
+				LocalizationManager.OnLanguageChanged += LoadTextures;
+
 				Debug.Log($"Loaded WiseSVN Preferences. WiseSVN is turned {(PersonalPrefs.EnableCoreIntegration ? "on" : "off")}.");
 
 				if (PersonalPrefs.EnableCoreIntegration) {
@@ -252,6 +259,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				ProjectPrefs = new ProjectPreferences();
 				m_ProjectPrefsLastModifiedTime = 0;
 			}
+
+			LocalizationManager.SetLanguage(PersonalPrefs.Language);
 		}
 
 		private void LoadTextures()
@@ -263,17 +272,17 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			FileStatusIcons[(int)VCFileStatus.Replaced] = LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
 			FileStatusIcons[(int)VCFileStatus.Deleted] = LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
 			FileStatusIcons[(int)VCFileStatus.Conflicted] = LoadTexture("SVNOverlayIcons/SVNConflictIcon");
-			FileStatusIcons[(int)VCFileStatus.Ignored] = LoadTexture("SVNOverlayIcons/SVNIgnoredIcon", "This item is in a svn-ignore list. It is not tracked by SVN.");
+			FileStatusIcons[(int)VCFileStatus.Ignored] = LoadTexture("SVNOverlayIcons/SVNIgnoredIcon", LocalizationManager.Tr("overlay.tooltip.ignored"));
 			FileStatusIcons[(int)VCFileStatus.Unversioned] = LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
-			FileStatusIcons[(int)VCFileStatus.Excluded] = LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon", "This item is excluded from monitoring by WiseSVN, but it may still be tracked by SVN. Check the WiseSVN preferences - Excludes setting.");
+			FileStatusIcons[(int)VCFileStatus.Excluded] = LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon", LocalizationManager.Tr("overlay.tooltip.excluded"));
 
 			LockStatusIcons = new GUIContent[Enum.GetValues(typeof(VCLockStatus)).Length];
-			LockStatusIcons[(int)VCLockStatus.LockedHere] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon", "You have locked this file.\nClick for more details.");
-			LockStatusIcons[(int)VCLockStatus.BrokenLock] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", "You have a lock that is no longer valid (someone else stole it and released it).\nClick for more details.");
-			LockStatusIcons[(int)VCLockStatus.LockedOther] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", "Someone else locked this file.\nClick for more details.");
-			LockStatusIcons[(int)VCLockStatus.LockedButStolen] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", "Your lock was stolen by someone else.\nClick for more details.");
+			LockStatusIcons[(int)VCLockStatus.LockedHere] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon", LocalizationManager.Tr("overlay.tooltip.locked_here"));
+			LockStatusIcons[(int)VCLockStatus.BrokenLock] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
+			LockStatusIcons[(int)VCLockStatus.LockedOther] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
+			LockStatusIcons[(int)VCLockStatus.LockedButStolen] = LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
 
-			RemoteStatusIcons = LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", "Asset is out of date. Update to avoid conflicts.");
+			RemoteStatusIcons = LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
 		}
 
 		public static GUIContent LoadTexture(string path, string tooltip = null)
@@ -312,6 +321,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			}
 
 			SVNContextMenusManager.SetupContextType(PersonalPrefs.ContextMenusClient);
+
+			LocalizationManager.SetLanguage(PersonalPrefs.Language);
 
 			PreferencesChanged?.Invoke();
 		}
@@ -486,10 +497,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		internal void TryToAuthenticate()
 		{
-			if (EditorUtility.DisplayDialog("SVN Authenticate",
-				"This process will open a terminal window and start an online request to your SVN repository. It will ask you to authenticate.\n\nThis is part of the SVN CLI process. WiseSVN doesn't know or store your username and password.",
-				"Proceed",
-				"Cancel")) {
+			if (EditorUtility.DisplayDialog(
+				LocalizationManager.Tr("prefs.svn_authenticate.title"),
+				LocalizationManager.Tr("prefs.svn_authenticate.message"),
+				LocalizationManager.Tr("prefs.svn_authenticate.proceed"),
+				LocalizationManager.Tr("common.cancel"))) {
 
 				WiseSVNIntegration.PromptForAuth(WiseSVNIntegration.ProjectRootNative);
 
