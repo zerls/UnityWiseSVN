@@ -304,6 +304,17 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				}
 			}
 
+			EditorGUILayout.Space(4);
+			EditorGUILayout.LabelField(TrContent("prefs.statusbar_header", "prefs.statusbar_header.tooltip"), EditorStyles.boldLabel);
+			m_PersonalPrefs.ShowSVNStatusOverlay  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_overlay",  "prefs.statusbar_overlay.tooltip"),  m_PersonalPrefs.ShowSVNStatusOverlay);
+			m_PersonalPrefs.ShowSVNStatusToolbar  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_toolbar",  "prefs.statusbar_toolbar.tooltip"),  m_PersonalPrefs.ShowSVNStatusToolbar);
+			m_PersonalPrefs.ShowSVNStatusTitleBar = EditorGUILayout.Toggle(TrContent("prefs.statusbar_titlebar", "prefs.statusbar_titlebar.tooltip"), m_PersonalPrefs.ShowSVNStatusTitleBar);
+			m_PersonalPrefs.AdaptiveSVNStatusColor = EditorGUILayout.Toggle(TrContent("prefs.statusbar_adaptive_color", "prefs.statusbar_adaptive_color.tooltip"), m_PersonalPrefs.AdaptiveSVNStatusColor);
+			EditorGUI.BeginDisabledGroup(m_PersonalPrefs.AdaptiveSVNStatusColor);
+			m_PersonalPrefs.SVNStatusBadgeColor = EditorGUILayout.ColorField(TrContent("prefs.statusbar_badge_color", "prefs.statusbar_badge_color.tooltip"), m_PersonalPrefs.SVNStatusBadgeColor);
+			EditorGUI.EndDisabledGroup();
+			EditorGUILayout.Space(4);
+
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
 			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
 			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
