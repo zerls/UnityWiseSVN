@@ -183,8 +183,19 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				userPath = m_ProjectPrefs.PlatformSvnCLIPath;
 			}
 
-			if (!string.IsNullOrWhiteSpace(userPath) && !File.Exists(userPath)) {
-				EditorUtility.DisplayDialog("SVN Binary Missing", $"Cannot find the \"svn\" executable specified in the svn preferences:\n\"{userPath}\"", "Ok");
+			if (!string.IsNullOrWhiteSpace(userPath)) {
+				// If user specified a directory, check for the svn binary inside it.
+				string checkPath = userPath;
+				if (Directory.Exists(checkPath)) {
+#if UNITY_EDITOR_WIN
+					checkPath = Path.Combine(checkPath, "svn.exe");
+#else
+					checkPath = Path.Combine(checkPath, "svn");
+#endif
+				}
+				if (!File.Exists(checkPath)) {
+					EditorUtility.DisplayDialog("SVN Binary Missing", $"Cannot find the \"svn\" executable specified in the svn preferences:\n\"{userPath}\"", "Ok");
+				}
 			}
 
 			if (m_ProjectPrefs.EnableLockPrompt) {
