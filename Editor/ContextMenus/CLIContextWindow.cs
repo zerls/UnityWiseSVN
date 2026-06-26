@@ -4,11 +4,11 @@
 #define CAN_DISABLE_REFRESH
 #endif
 
+using DevLocker.VersionControl.WiseSVN.Localization;
 using DevLocker.VersionControl.WiseSVN.Shell;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEditor;
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 {
@@ -28,7 +28,6 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 
 		private bool m_IsWorking => m_SVNOperation != null && !m_SVNOperation.HasFinished;
 
-
 		private SVNAsyncOperation<ShellUtils.ShellResult> m_SVNOperation;
 
 		public static void Show(string commandArgs, bool autoRun)
@@ -37,7 +36,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 
 			window.position = new Rect(window.position.xMin + 100f, window.position.yMin + 100f, 700f, 600f);
 			window.minSize = new Vector2(700f, 400f);
-			window.titleContent = new GUIContent("SVN CLI Window");
+			window.titleContent = new GUIContent(Tr("cli.window.title"));
 
 			window.m_CommandArgs = commandArgs;
 			window.m_AutoRun = autoRun;
@@ -49,10 +48,13 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 #if CAN_DISABLE_REFRESH
 			AssetDatabase.DisallowAutoRefresh();
 #endif
+			LocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+			LocalizationManager.OnLanguageChanged += OnLanguageChanged;
 		}
 
 		void OnDisable()
 		{
+			LocalizationManager.OnLanguageChanged -= OnLanguageChanged;
 #if CAN_DISABLE_REFRESH
 			AssetDatabase.AllowAutoRefresh();
 			AssetDatabase.Refresh();
@@ -66,6 +68,12 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 			}
 		}
 
+		private void OnLanguageChanged()
+		{
+			titleContent = new GUIContent(Tr("cli.window.title"));
+			Repaint();
+		}
+
 		void OnGUI()
 		{
 			var textAreaStyle = new GUIStyle(EditorStyles.textArea);
@@ -74,7 +82,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 
 			EditorGUI.BeginDisabledGroup(true);
 			{
-				EditorGUILayout.TextField("Command", "svn");
+				EditorGUILayout.TextField(Tr("cli.command"), "svn");
 			}
 			EditorGUI.EndDisabledGroup();
 
@@ -88,7 +96,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 			EditorGUI.EndDisabledGroup();
 
 
-			EditorGUILayout.LabelField("Output:");
+			EditorGUILayout.LabelField(Tr("cli.output"));
 			m_OutputScroll = EditorGUILayout.BeginScrollView(m_OutputScroll);
 			EditorGUILayout.TextArea(m_CombinedOutput, textAreaStyle, GUILayout.ExpandHeight(true));
 			EditorGUILayout.EndScrollView();
@@ -100,18 +108,18 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 			{
 				EditorGUI.BeginDisabledGroup(!m_IsWorking);
 
-				if (GUILayout.Button("Abort")) {
+				if (GUILayout.Button(Tr("cli.abort"))) {
 					m_SVNOperation.Abort(false);
-					m_CombinedOutput += "Aborting...\n";
-					m_StateLabel = "Aborting...";
+					m_CombinedOutput += Tr("common.aborting") + "\n";
+					m_StateLabel = Tr("common.aborting");
 					m_StateColor = Color.red;
 					GUI.FocusControl("");
 				}
 
-				if (GUILayout.Button("Kill")) {
+				if (GUILayout.Button(Tr("cli.kill"))) {
 					m_SVNOperation.Abort(true);
-					m_CombinedOutput += "Killing...\n";
-					m_StateLabel = "Killing...";
+					m_CombinedOutput += Tr("cli.killing") + "\n";
+					m_StateLabel = Tr("cli.killing");
 					m_StateColor = Color.red;
 					GUI.FocusControl("");
 				}
@@ -127,14 +135,14 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 				GUILayout.FlexibleSpace();
 
 				GUI.color = Color.yellow;
-				GUILayout.Label("Assets Auto Refresh Disabled!", GUILayout.ExpandWidth(false));
+				GUILayout.Label(Tr("cli.assets_auto_refresh_disabled"), GUILayout.ExpandWidth(false));
 				GUI.color = prevColor;
 
-				if (GUILayout.Button("Clear Output")) {
+				if (GUILayout.Button(Tr("cli.clear_output"))) {
 					m_CombinedOutput = "";
 					GUI.FocusControl("");
 				}
-				if (GUILayout.Button("Copy Output")) {
+				if (GUILayout.Button(Tr("cli.copy_output"))) {
 					GUIUtility.systemCopyBuffer = m_CombinedOutput;
 					GUI.FocusControl("");
 				}
@@ -148,7 +156,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 					m_AutoRun = false;
 				}
 
-				if (GUILayout.Button("Run") || m_AutoRun) {
+				if (GUILayout.Button(Tr("cli.run")) || m_AutoRun) {
 					m_AutoRun = false;
 					GUI.FocusControl("");
 					m_CommandArgs = m_CommandArgs.Trim();
@@ -167,10 +175,10 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 
 					m_SVNOperation.Completed += (op) => {
 						if (op.Result.HasErrors) {
-							m_StateLabel = "Failed!";
+							m_StateLabel = Tr("common.failed");
 							m_StateColor = Color.red;
 						} else {
-							m_StateLabel = op.AbortRequested ? "Aborted!" : "Completed!";
+							m_StateLabel = op.AbortRequested ? Tr("common.aborted") : Tr("common.completed");
 							m_StateColor = op.AbortRequested ? Color.red : Color.green;
 						}
 
@@ -184,7 +192,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 						}
 					};
 
-					m_StateLabel = "Working...";
+					m_StateLabel = Tr("common.working");
 					m_StateColor = Color.yellow;
 				}
 

@@ -156,6 +156,15 @@ lockprompt.btn.lock_selected=Lock Selected
 lockprompt.deleted=deleted
 lockprompt.meta=meta
 lockprompt.moved_to_tooltip=Moved to...
+lockprompt.revert_meta.title=Revert meta
+lockprompt.revert_meta.msg=Reverting meta files directly for Added or Deleted assets is usually a bad idea. Are you sure?
+lockprompt.revert_meta.confirm=Revert .meta
+lockprompt.revert_moved.title=Revert Moved Asset
+lockprompt.revert_moved.msg=This asset was moved to\n\"{0}\"\n\nDo you want to move it back instead?
+lockprompt.revert_moved.move_back=Move it back
+lockprompt.revert_moved.revert_deleted=Revert deleted
+lockprompt.revert_error.title=Revert Error
+lockprompt.revert_error.msg=Couldn't move asset back:\n\"{0}\"
 
 # ========== Branch Selector Window ==========
 branches.window.title=Branch Selector

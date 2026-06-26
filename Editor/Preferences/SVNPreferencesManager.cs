@@ -199,8 +199,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 					EditorApplication.update += reloadTextures;
 				}
 
-				LocalizationManager.OnLanguageChanged -= LoadTextures;
-				LocalizationManager.OnLanguageChanged += LoadTextures;
+				// Subscribe via a static forwarder so assembly reloads don't leak instance refs on the event.
+				LocalizationManager.OnLanguageChanged -= OnLanguageChangedReloadTextures;
+				LocalizationManager.OnLanguageChanged += OnLanguageChangedReloadTextures;
 
 				Debug.Log($"Loaded WiseSVN Preferences. WiseSVN is turned {(PersonalPrefs.EnableCoreIntegration ? "on" : "off")}.");
 
@@ -210,6 +211,14 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			}
 
 			SVNContextMenusManager.SetupContextType(PersonalPrefs.ContextMenusClient);
+		}
+
+		// Static forwarder so the LocalizationManager.OnLanguageChanged event
+		// holds a single delegate across assembly reloads (no instance leaks).
+		private static void OnLanguageChangedReloadTextures()
+		{
+			var inst = Instance;
+			if (inst != null) inst.LoadTextures();
 		}
 
 		public GUIContent GetFileStatusIconContent(VCFileStatus status)
@@ -322,7 +331,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			SVNContextMenusManager.SetupContextType(PersonalPrefs.ContextMenusClient);
 
-			LocalizationManager.SetLanguage(PersonalPrefs.Language);
+			// Only reload locale if the requested language actually changed —
+			// the Personal tab UI already called SetLanguage on change.
+			if (LocalizationManager.Language != PersonalPrefs.Language) {
+				LocalizationManager.SetLanguage(PersonalPrefs.Language);
+			}
 
 			PreferencesChanged?.Invoke();
 		}
