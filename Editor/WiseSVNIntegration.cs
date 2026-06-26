@@ -156,10 +156,20 @@ namespace DevLocker.VersionControl.WiseSVN
 				if (string.IsNullOrWhiteSpace(userPath))
 					return "svn";
 
-				return userPath.StartsWith("/") || userPath.Contains(":")
+				string resolvedPath = userPath.StartsWith("/") || userPath.Contains(":")
 					? userPath // Assume absolute path
-					: Path.Combine(ProjectRootNative, userPath)
-					;
+					: Path.Combine(ProjectRootNative, userPath);
+
+				// If user specified a directory instead of the executable, auto-append svn binary name.
+				if (Directory.Exists(resolvedPath)) {
+#if UNITY_EDITOR_WIN
+					resolvedPath = Path.Combine(resolvedPath, "svn.exe");
+#else
+					resolvedPath = Path.Combine(resolvedPath, "svn");
+#endif
+				}
+
+				return resolvedPath;
 			}
 		}
 
