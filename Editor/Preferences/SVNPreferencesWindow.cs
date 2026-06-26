@@ -287,6 +287,23 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			m_PersonalPrefs.IconStyle = (WiseSVNIconStyle) EditorGUILayout.EnumPopup(
 				TrContent("prefs.icon_style", "prefs.icon_style.tooltip"), m_PersonalPrefs.IconStyle);
 
+			if (m_PersonalPrefs.IconStyle == WiseSVNIconStyle.TortoiseSVN) {
+				string iconsDir = SVNPreferencesManager.GetTortoiseOverlaysIconsDir();
+				if (string.IsNullOrEmpty(iconsDir)) {
+					EditorGUILayout.HelpBox(Tr("prefs.icon_theme.not_found"), MessageType.Warning);
+				} else {
+					string[] themes = SVNPreferencesManager.GetAvailableTortoiseThemes();
+					int idx = Array.IndexOf(themes, m_PersonalPrefs.TortoiseSVNTheme);
+					if (idx < 0) idx = Array.IndexOf(themes, "Win10");
+					if (idx < 0 && themes.Length > 0) idx = 0;
+					if (themes.Length > 0) {
+						int newIdx = EditorGUILayout.Popup(TrContent("prefs.icon_theme", "prefs.icon_theme.tooltip"), idx, themes);
+						if (newIdx != idx || string.IsNullOrEmpty(m_PersonalPrefs.TortoiseSVNTheme))
+							m_PersonalPrefs.TortoiseSVNTheme = themes[newIdx];
+					}
+				}
+			}
+
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
 			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
 			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
