@@ -2181,6 +2181,7 @@ namespace DevLocker.VersionControl.WiseSVN
 				return;
 
 			string displayMessage;
+			bool isWarning = false;
 
 			switch(result) {
 				case StatusOperationResult.NotWorkingCopy:
@@ -2198,7 +2199,8 @@ namespace DevLocker.VersionControl.WiseSVN
 					break;
 
 				case StatusOperationResult.UnableToConnectError:
-					displayMessage = "SVN Error: Unable to connect to SVN repository server. Check your network connection. Overlay icons may not work correctly.";
+					displayMessage = "SVN Warning: Unable to connect to SVN repository server. Check your network connection. Overlay icons may not work correctly.";
+					isWarning = true;
 					break;
 
 				case StatusOperationResult.ExecutableNotFound:
@@ -2225,7 +2227,8 @@ namespace DevLocker.VersionControl.WiseSVN
 			}
 
 			if (!string.IsNullOrEmpty(displayMessage) && !Silent && m_LastDisplayedError != displayMessage) {
-				Debug.LogError($"{displayMessage} {suffix}\n");
+				if (isWarning) Debug.LogWarning($"{displayMessage} {suffix}\n");
+				else           Debug.LogError($"{displayMessage} {suffix}\n");
 				m_LastDisplayedError = displayMessage;
 				//DisplayError(displayMessage);	// Not thread-safe.
 			}

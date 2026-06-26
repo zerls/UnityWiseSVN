@@ -58,6 +58,15 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public WiseSVNIconStyle IconStyle = WiseSVNIconStyle.Classic;
 			public string TortoiseSVNTheme = "Win10";
 
+			// Status badge display locations (each independently toggled).
+			public bool ShowSVNStatusOverlay  = true;   // Floating SceneView overlay panel
+			public bool ShowSVNStatusToolbar  = true;   // SceneView toolbar item
+			public bool ShowSVNStatusTitleBar = false;  // Windows title bar (Win32, experimental)
+
+			// Badge color: adaptive changes color based on SVN state; fixed uses SVNStatusBadgeColor.
+			public bool AdaptiveSVNStatusColor = true;
+			public Color SVNStatusBadgeColor = new Color(0.18f, 0.38f, 0.62f, 1f);
+
 #if UNITY_2020_2_OR_NEWER
 			[NonReorderable]
 #endif
