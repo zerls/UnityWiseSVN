@@ -62,7 +62,8 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 			EnsureFallbackLoaded();
 
 			if (s_ResolvedLanguage == WiseSVNLanguage.English) {
-				s_Current = s_Fallback;
+				// Copy, do NOT share the dictionary reference — future reloads must not mutate fallback.
+				s_Current = new Dictionary<string, string>(s_Fallback);
 			} else {
 				s_Current = LoadLocale(LocaleFileName(s_ResolvedLanguage));
 			}
@@ -142,8 +143,8 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 					if (eq <= 0) continue;
 					string key = line.Substring(0, eq).Trim();
 					string value = line.Substring(eq + 1);
-					// Allow escape sequences in values.
-					value = value.Replace("\\n", "\n").Replace("\\t", "\t").Replace("\\\"", "\"");
+					// Allow escape sequences in values. \\ first so we don't re-process escaped backslashes.
+					value = UnescapeLocaleValue(value);
 					dict[key] = value;
 				}
 			} catch (Exception ex) {
@@ -153,17 +154,48 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 			return dict;
 		}
 
+		// Cache resolved locale file paths so we don't hammer AssetDatabase.FindAssets on every reload.
+		private static readonly Dictionary<string, string> s_LocalePathCache = new Dictionary<string, string>();
+
 		private static string FindLocaleFilePath(string fileNameNoExt)
 		{
+			if (s_LocalePathCache.TryGetValue(fileNameNoExt, out string cached) && File.Exists(cached))
+				return cached;
+
 			// Search via AssetDatabase to locate locale files no matter where the plugin lives.
 			string[] guids = AssetDatabase.FindAssets(fileNameNoExt + " t:TextAsset");
 			foreach (string guid in guids) {
 				string assetPath = AssetDatabase.GUIDToAssetPath(guid);
 				if (!assetPath.Contains("/" + LocaleDirRelative + "/")) continue;
 				if (!assetPath.EndsWith(fileNameNoExt + ".txt", StringComparison.OrdinalIgnoreCase)) continue;
-				return Path.Combine(Directory.GetCurrentDirectory(), assetPath);
+				string full = Path.Combine(Directory.GetCurrentDirectory(), assetPath);
+				s_LocalePathCache[fileNameNoExt] = full;
+				return full;
 			}
 			return null;
+		}
+
+		// Manual unescape that handles \\ before \n / \t / \" so escaped backslashes aren't re-processed.
+		private static string UnescapeLocaleValue(string raw)
+		{
+			var sb = new System.Text.StringBuilder(raw.Length);
+			for (int i = 0; i < raw.Length; i++) {
+				char c = raw[i];
+				if (c == '\\' && i + 1 < raw.Length) {
+					char next = raw[++i];
+					switch (next) {
+						case 'n':  sb.Append('\n'); break;
+						case 't':  sb.Append('\t'); break;
+						case 'r':  sb.Append('\r'); break;
+						case '"':  sb.Append('"');  break;
+						case '\\': sb.Append('\\'); break;
+						default:   sb.Append('\\').Append(next); break;
+					}
+				} else {
+					sb.Append(c);
+				}
+			}
+			return sb.ToString();
 		}
 
 		/// <summary>Force reload of the active locale; useful after editing locale files.</summary>

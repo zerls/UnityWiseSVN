@@ -247,13 +247,20 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			var sp = m_SerializedObject.FindProperty("m_PersonalPrefs");
 
 			// Language selector — apply immediately so the rest of the window re-localizes on the next OnGUI.
+			// Use custom labels (localized) instead of enum names so users see "简体中文" not "ChineseSimplified".
+			var langValues = new[] { WiseSVNLanguage.Auto, WiseSVNLanguage.English, WiseSVNLanguage.ChineseSimplified };
+			var langLabels = new[] {
+				new GUIContent(Tr("prefs.language.auto")),
+				new GUIContent(Tr("prefs.language.english")),
+				new GUIContent(Tr("prefs.language.chinese_simplified")),
+			};
+			int langIndex = Array.IndexOf(langValues, m_PersonalPrefs.Language);
+			if (langIndex < 0) langIndex = 0;
 			EditorGUI.BeginChangeCheck();
-			var newLang = (WiseSVNLanguage)EditorGUILayout.EnumPopup(
-				TrContent("prefs.language", "prefs.language.tooltip"),
-				m_PersonalPrefs.Language);
-			if (EditorGUI.EndChangeCheck() && newLang != m_PersonalPrefs.Language) {
-				m_PersonalPrefs.Language = newLang;
-				LocalizationManager.SetLanguage(newLang);
+			int newIndex = EditorGUILayout.Popup(TrContent("prefs.language", "prefs.language.tooltip"), langIndex, langLabels);
+			if (EditorGUI.EndChangeCheck() && langValues[newIndex] != m_PersonalPrefs.Language) {
+				m_PersonalPrefs.Language = langValues[newIndex];
+				LocalizationManager.SetLanguage(m_PersonalPrefs.Language);
 			}
 
 			m_PersonalPrefs.EnableCoreIntegration = EditorGUILayout.Toggle(Tr("prefs.enable_svn"), m_PersonalPrefs.EnableCoreIntegration);
@@ -322,47 +329,37 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		private void DrawProjectPreferences()
 		{
-			EditorGUILayout.HelpBox("These settings will be saved in the ProjectSettings folder.\nFeel free to add them to your version control system.\nCoordinate any changes here with your team.", MessageType.Warning);
+			EditorGUILayout.HelpBox(Tr("prefs.project.help"), MessageType.Warning);
 
 			var sp = m_SerializedObject.FindProperty("m_ProjectPrefs");
 
-			m_ProjectPrefs.DownloadRepositoryChanges = EditorGUILayout.Toggle(new GUIContent("Check for repository changes", m_DownloadRepositoryChangesHint), m_ProjectPrefs.DownloadRepositoryChanges);
+			m_ProjectPrefs.DownloadRepositoryChanges = EditorGUILayout.Toggle(TrContent("prefs.check_repo_changes", "prefs.check_repo_changes.tooltip"), m_ProjectPrefs.DownloadRepositoryChanges);
 
-			m_ProjectPrefs.SvnCLIPath = EditorGUILayout.TextField(new GUIContent("SVN CLI Path", "Specify SVN CLI (svn.exe) binary path to use or leave empty for the defaults."), m_ProjectPrefs.SvnCLIPath);
-			m_ProjectPrefs.SvnCLIPathMacOS = EditorGUILayout.TextField(new GUIContent("SVN CLI Path MacOS", "Same as above, but for MacOS."), m_ProjectPrefs.SvnCLIPathMacOS);
+			m_ProjectPrefs.SvnCLIPath = EditorGUILayout.TextField(TrContent("prefs.svn_cli_path", "prefs.svn_cli_path.tooltip"), m_ProjectPrefs.SvnCLIPath);
+			m_ProjectPrefs.SvnCLIPathMacOS = EditorGUILayout.TextField(TrContent("prefs.svn_cli_path_macos", "prefs.svn_cli_path_macos.tooltip"), m_ProjectPrefs.SvnCLIPathMacOS);
 
-			m_ProjectPrefs.MoveBehaviour = (SVNMoveBehaviour)EditorGUILayout.EnumPopup(new GUIContent("Assets move behaviour", "Depending on your SVN repository, sometimes you may need to execute move commands as simple add and remove operations, loosing their history. Use with caution.\n(I'm looking at you github that emulates svn)."), m_ProjectPrefs.MoveBehaviour);
+			m_ProjectPrefs.MoveBehaviour = (SVNMoveBehaviour)EditorGUILayout.EnumPopup(TrContent("prefs.assets_move_behaviour", "prefs.assets_move_behaviour.tooltip"), m_ProjectPrefs.MoveBehaviour);
 
 			if (!m_PersonalPrefs.PopulateStatusesDatabase) {
-				EditorGUILayout.HelpBox("Lock prompts require enabled overlay icons support from the Personal preferences!", MessageType.Warning);
+				EditorGUILayout.HelpBox(Tr("prefs.lockprompt_require_overlay"), MessageType.Warning);
 			}
 			EditorGUI.BeginDisabledGroup(!m_PersonalPrefs.PopulateStatusesDatabase);
 
 			bool prevLockPrompt = m_ProjectPrefs.EnableLockPrompt;
-			m_ProjectPrefs.EnableLockPrompt = EditorGUILayout.Toggle(new GUIContent("Enable Lock Prompts", "Prompt user to lock assets when it or its meta becomes modified."), m_ProjectPrefs.EnableLockPrompt);
+			m_ProjectPrefs.EnableLockPrompt = EditorGUILayout.Toggle(TrContent("prefs.enable_lock_prompts", "prefs.enable_lock_prompts.tooltip"), m_ProjectPrefs.EnableLockPrompt);
 			if (m_ProjectPrefs.EnableLockPrompt) {
 				EditorGUI.indentLevel++;
 
-				m_FoldLockPromptHint = EditorGUILayout.Foldout(m_FoldLockPromptHint, "Lock Prompt Hint:");
-				var lockPromptHint = "If asset or its meta becomes modified a pop-up window will prompt the user to lock or ignore it.\n" +
-								   "It shows if modified assets are locked by others or out of date, which prevents locking them.\n" +
-								   "If left unlocked, the window won't prompt again for those assets.\n" +
-								   "On editor startup user will be prompted again for all modified unlocked assets.\n\n" +
-								   "Describe below what asset folders and asset types should be monitored for locking.\n" +
-								   "To monitor the whole project, type in \"Assets\" for TargetFolder\n" +
-								   "Coordinate this with your team and commit the preference.\n" +
-								   "Must have at least one entry to work properly."
-
-					;
+				m_FoldLockPromptHint = EditorGUILayout.Foldout(m_FoldLockPromptHint, Tr("prefs.lockprompt_hint_title"));
 
 				if (m_FoldLockPromptHint) {
 					EditorGUILayout.BeginHorizontal();
 					GUILayout.Space((EditorGUI.indentLevel + 1) * 16f);
-					GUILayout.Label(lockPromptHint, EditorStyles.helpBox);
+					GUILayout.Label(Tr("prefs.lockprompt_hint"), EditorStyles.helpBox);
 					EditorGUILayout.EndHorizontal();
 				}
 
-				EditorGUILayout.PropertyField(sp.FindPropertyRelative("LockPromptMessage"), new GUIContent("Lock Message", SVNPreferencesManager.ProjectPreferences.LockMessageHint));
+				EditorGUILayout.PropertyField(sp.FindPropertyRelative("LockPromptMessage"), TrContent("prefs.lock_message"));
 
 				EditorGUILayout.PropertyField(sp.FindPropertyRelative("AutoUnlockIfUnmodified"));
 
@@ -405,31 +402,26 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			EditorGUI.EndDisabledGroup();
 
 			bool prevBranchesDatabase = m_ProjectPrefs.EnableBranchesDatabase;
-			const string branchesEnableHint = "Scans the SVN repository for Unity projects in branches and keeps them in a simple database.\n\nSingle scan may take up to a few minutes, depending on your network connection and the complexity of your repository.";
-			m_ProjectPrefs.EnableBranchesDatabase = EditorGUILayout.Toggle(new GUIContent("Enable Branches Database", branchesEnableHint), m_ProjectPrefs.EnableBranchesDatabase);
+			m_ProjectPrefs.EnableBranchesDatabase = EditorGUILayout.Toggle(TrContent("prefs.enable_branches_db", "prefs.enable_branches_db.tooltip"), m_ProjectPrefs.EnableBranchesDatabase);
 			if (m_ProjectPrefs.EnableBranchesDatabase) {
 
 				EditorGUI.indentLevel++;
-				m_FoldBranchesDatabaseHint = EditorGUILayout.Foldout(m_FoldBranchesDatabaseHint, "Branches Database Hint:");
-				var branchesHint = "Provide at least one branches scan parameter below.\n\n" +
-				                   "\"Entry Point URL\" serves as a starting location where scan will commence.\n\n" +
-				                   "\"Branch Signature Root Entries\" should contain names of files or folders that mark the beginning of a branch. This will be shown as a branch's name.\n\n" +
-				                   "Example setup:\n" +
-				                   "  /branches/VariantA/Server\n" +
-				                   "  /branches/VariantA/UnityClient\n" +
-				                   "  /branches/VariantB/Server\n" +
-				                   "  /branches/VariantB/UnityClient\n\n" +
-				                   "Set \"Entry Point URL\" to \"https://companyname.com/branches\" as a starting point.\n" +
-				                   "\"VariantA\" and \"VariantB\" should be considered as branch roots.\n" +
-				                   "UnityClient folder is not a branch root.\n" +
-				                   "Set \"Branch Signature Root Entries\" to { \"Server\", \"UnityClient\" } to match the roots ...\n\n" +
-				                   "Only one Unity project per branch is supported!" +
-				                   ""
-					;
+				m_FoldBranchesDatabaseHint = EditorGUILayout.Foldout(m_FoldBranchesDatabaseHint, Tr("prefs.branches_db_hint_title"));
 				if (m_FoldBranchesDatabaseHint) {
 					EditorGUILayout.BeginHorizontal();
 					GUILayout.Space((EditorGUI.indentLevel + 1) * 16f);
-					GUILayout.Label(branchesHint, EditorStyles.helpBox);
+					// Keep the technical example hardcoded — path examples don't translate well.
+					GUILayout.Label(
+						"Provide at least one branches scan parameter below.\n\n" +
+						"\"Entry Point URL\" serves as a starting location where scan will commence.\n\n" +
+						"\"Branch Signature Root Entries\" should contain names of files or folders that mark the beginning of a branch.\n\n" +
+						"Example setup:\n" +
+						"  /branches/VariantA/Server\n" +
+						"  /branches/VariantA/UnityClient\n\n" +
+						"Set \"Entry Point URL\" to \"https://companyname.com/branches\" as a starting point.\n" +
+						"Set \"Branch Signature Root Entries\" to { \"Server\", \"UnityClient\" } to match the roots.\n\n" +
+						"Only one Unity project per branch is supported!",
+						EditorStyles.helpBox);
 					EditorGUILayout.EndHorizontal();
 				}
 
@@ -454,36 +446,42 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 					});
 				}
 
-				EditorGUILayout.PropertyField(sp.FindPropertyRelative("BranchesDatabaseScanParameters"), new GUIContent("Branches Scan Parameters", "Must have at least one entry to work properly."), true);
+				EditorGUILayout.PropertyField(sp.FindPropertyRelative("BranchesDatabaseScanParameters"), TrContent("prefs.branches_scan_params", "prefs.branches_scan_params.tooltip"), true);
 
-				EditorGUILayout.PropertyField(sp.FindPropertyRelative("PinnedBranches"), new GUIContent("Pinned Branches", "Pin these branches at the top."), true);
+				EditorGUILayout.PropertyField(sp.FindPropertyRelative("PinnedBranches"), TrContent("prefs.pinned_branches", "prefs.pinned_branches.tooltip"), true);
 
 				EditorGUI.indentLevel--;
 			}
 
-			EditorGUILayout.PropertyField(sp.FindPropertyRelative("Exclude"), new GUIContent("Exclude Paths", "Relative path (contains '/') or asset name to be ignored by the SVN integrations. Use with caution.\n\nExample: \"Assets/Scenes/Baked\" or \"_deprecated\""), true);
+			EditorGUILayout.PropertyField(sp.FindPropertyRelative("Exclude"), TrContent("prefs.exclude_paths", "prefs.exclude_paths.tooltip"), true);
 		}
 
 		public static void DrawHelpAbout()
 		{
-			EditorGUILayout.LabelField("Version: " + GetVersion(), EditorStyles.boldLabel);
-			EditorGUILayout.LabelField("Help:", EditorStyles.boldLabel);
+			EditorGUILayout.LabelField(Tr("prefs.version", GetVersion()), EditorStyles.boldLabel);
+			EditorGUILayout.LabelField(Tr("prefs.help"), EditorStyles.boldLabel);
 
-			if (GUILayout.Button("Documentation", GUILayout.MaxWidth(EditorGUIUtility.labelWidth))) {
-				var assets = AssetDatabase.FindAssets("WiseSVN-Documentation");
-				if (assets.Length == 0) {
-					EditorUtility.DisplayDialog("Documentation missing!", "The documentation you requested is missing.", "Ok");
+			if (GUILayout.Button(Tr("prefs.documentation"), GUILayout.MaxWidth(EditorGUIUtility.labelWidth))) {
+				// Open language-appropriate user guide from Docs/ if available, else legacy RTF.
+				string langSuffix = LocalizationManager.ResolvedLanguage == WiseSVNLanguage.ChineseSimplified ? "_CN" : "_EN";
+				string guidePath = "Docs/UserGuide" + langSuffix + ".md";
+				if (System.IO.File.Exists(guidePath)) {
+					Application.OpenURL(Environment.CurrentDirectory + "/" + guidePath);
 				} else {
-					Application.OpenURL(Environment.CurrentDirectory + "/" + AssetDatabase.GUIDToAssetPath(assets[0]));
+					var assets = AssetDatabase.FindAssets("WiseSVN-Documentation");
+					if (assets.Length == 0) {
+						EditorUtility.DisplayDialog(Tr("prefs.documentation_missing.title"), Tr("prefs.documentation_missing.message"), Tr("common.ok"));
+					} else {
+						Application.OpenURL(Environment.CurrentDirectory + "/" + AssetDatabase.GUIDToAssetPath(assets[0]));
+					}
 				}
 			}
 
-			if (GUILayout.Button("Copy Report Data to Clipboard", GUILayout.MaxWidth(EditorGUIUtility.labelWidth))) {
+			if (GUILayout.Button(Tr("prefs.copy_report_data"), GUILayout.MaxWidth(EditorGUIUtility.labelWidth))) {
 				WiseSVNIntegration.CopyDebugData(GetVersion());
 			}
 
-
-			EditorGUILayout.LabelField("About:", EditorStyles.boldLabel);
+			EditorGUILayout.LabelField(Tr("prefs.about"), EditorStyles.boldLabel);
 			{
 				var urlStyle = new GUIStyle(EditorStyles.label);
 				urlStyle.normal.textColor = EditorGUIUtility.isProSkin ? new Color(1.00f, 0.65f, 0.00f) : Color.blue;
@@ -491,63 +489,47 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 				const string mail = "NibbleByte3@gmail.com";
 
-				GUILayout.Label("Created by Filip Slavov", GUILayout.ExpandWidth(false));
+				GUILayout.Label(Tr("prefs.created_by"), GUILayout.ExpandWidth(false));
 				if (GUILayout.Button(mail, urlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("mailto:"+mail);
 				}
 
-				EditorGUILayout.LabelField("In collaboration with Snapshot Games");
-
-
+				EditorGUILayout.LabelField(Tr("prefs.in_collaboration"));
+				EditorGUILayout.LabelField(Tr("prefs.fork_note"));
 
 				EditorGUILayout.BeginHorizontal();
 
-				if (GUILayout.Button("Asset Store", urlStyle, GUILayout.ExpandWidth(false))) {
-					var assetStoreURL = "https://assetstore.unity.com/packages/tools/version-control/wise-svn-162636";
-					Application.OpenURL(assetStoreURL);
+				if (GUILayout.Button(Tr("prefs.asset_store"), urlStyle, GUILayout.ExpandWidth(false))) {
+					Application.OpenURL("https://assetstore.unity.com/packages/tools/version-control/wise-svn-162636");
 				}
-
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-
-				if (GUILayout.Button("GitHub", urlStyle, GUILayout.ExpandWidth(false))) {
-					var githubURL = "https://github.com/NibbleByte/UnityWiseSVN";
-					Application.OpenURL(githubURL);
+				if (GUILayout.Button(Tr("prefs.github"), urlStyle, GUILayout.ExpandWidth(false))) {
+					Application.OpenURL("https://github.com/NibbleByte/UnityWiseSVN");
 				}
-
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-
-				if (GUILayout.Button("Unity Forum", urlStyle, GUILayout.ExpandWidth(false))) {
-					var unityForumURL = "https://forum.unity.com/threads/wise-svn-powerful-tortoisesvn-snailsvn-integration.844168";
-					Application.OpenURL(unityForumURL);
+				if (GUILayout.Button(Tr("prefs.unity_forum"), urlStyle, GUILayout.ExpandWidth(false))) {
+					Application.OpenURL("https://forum.unity.com/threads/wise-svn-powerful-tortoisesvn-snailsvn-integration.844168");
 				}
-
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-
-				if (GUILayout.Button("Reddit", urlStyle, GUILayout.ExpandWidth(false))) {
-					var redditURL = "https://www.reddit.com/r/Unity3D/comments/fgjovk/finally_a_fully_working_tortoisesvn_snailsvn";
-					Application.OpenURL(redditURL);
+				if (GUILayout.Button(Tr("prefs.reddit"), urlStyle, GUILayout.ExpandWidth(false))) {
+					Application.OpenURL("https://www.reddit.com/r/Unity3D/comments/fgjovk/finally_a_fully_working_tortoisesvn_snailsvn");
 				}
-
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-
-				if (GUILayout.Button("OpenUPM", urlStyle, GUILayout.ExpandWidth(false))) {
-					var openUPMurl = "https://openupm.com/packages/devlocker.versioncontrol.wisesvn";
-					Application.OpenURL(openUPMurl);
+				if (GUILayout.Button(Tr("prefs.openupm"), urlStyle, GUILayout.ExpandWidth(false))) {
+					Application.OpenURL("https://openupm.com/packages/devlocker.versioncontrol.wisesvn");
 				}
 
 				EditorGUILayout.EndHorizontal();
-
 				EditorGUILayout.Space();
 
-				if (GUILayout.Button("Icons taken from TortoiseSVN (created by Lьbbe Onken)", urlStyle, GUILayout.ExpandWidth(true))) {
-					var assetStoreURL = "https://tortoisesvn.net/";
-					Application.OpenURL(assetStoreURL);
+				if (GUILayout.Button(Tr("prefs.icons_credit"), urlStyle, GUILayout.ExpandWidth(true))) {
+					Application.OpenURL("https://tortoisesvn.net/");
 				}
 
 				GUILayout.FlexibleSpace();
 
-				EditorGUILayout.LabelField("Random Video:", EditorStyles.boldLabel);
-				GUILayout.Label("This plugin took a lot of time to make.\nHere are some random videos worth spreading that distracted me along the way. :D");
+				EditorGUILayout.LabelField(Tr("prefs.random_video"), EditorStyles.boldLabel);
+				GUILayout.Label(Tr("prefs.random_video.hint"));
 
 				if (m_RandomVideoIndex == -1) {
 					m_RandomVideoIndex = UnityEngine.Random.Range(0, m_RandomVideos.Count);
@@ -556,7 +538,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				if (GUILayout.Button(m_RandomVideos.Keys.ElementAt(m_RandomVideoIndex), urlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL(m_RandomVideos.Values.ElementAt(m_RandomVideoIndex));
 				}
-				if (GUILayout.Button("Next Video", GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.next_video"), GUILayout.ExpandWidth(false))) {
 					m_RandomVideoIndex = (m_RandomVideoIndex + 1) % m_RandomVideos.Count;
 				}
 			}

@@ -156,6 +156,15 @@ lockprompt.btn.lock_selected=锁定所选
 lockprompt.deleted=已删除
 lockprompt.meta=meta
 lockprompt.moved_to_tooltip=已移动到...
+lockprompt.revert_meta.title=回滚 meta
+lockprompt.revert_meta.msg=对已添加或已删除资源的 meta 文件直接回滚通常是不好的做法。确定吗？
+lockprompt.revert_meta.confirm=回滚 .meta
+lockprompt.revert_moved.title=回滚已移动资源
+lockprompt.revert_moved.msg=此资源已移动到\n\"{0}\"\n\n要将它移回原位吗？
+lockprompt.revert_moved.move_back=移回原位
+lockprompt.revert_moved.revert_deleted=回滚删除
+lockprompt.revert_error.title=回滚错误
+lockprompt.revert_error.msg=无法将资源移回：\n\"{0}\"
 
 # ========== 分支选择窗口 ==========
 branches.window.title=分支选择器

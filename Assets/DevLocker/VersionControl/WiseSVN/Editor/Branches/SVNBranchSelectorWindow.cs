@@ -1,10 +1,12 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
+using DevLocker.VersionControl.WiseSVN.Localization;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
 namespace DevLocker.VersionControl.WiseSVN.Branches
 {
@@ -134,7 +136,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 		private static void OpenBranchesSelector()
 		{
 			var window = CreateInstance<SVNBranchSelectorWindow>();
-			window.titleContent = new GUIContent("Branch Selector");
+			window.titleContent = new GUIContent(Tr("branches.window.title"));
 
 			var assetPath = Selection.assetGUIDs.Select(AssetDatabase.GUIDToAssetPath).FirstOrDefault();
 			window.m_TargetAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
@@ -148,8 +150,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			BorderStyle.padding = new RectOffset(1, 1, 1, 1);
 			BorderStyle.margin = new RectOffset();
 
-			const string refreshBranchesHint = "Refresh branches cache database.\n\nNOTE: Single scan may take up to a few minutes, depending on your network connection and the complexity of your repository.";
-			RefreshBranchesContent = new GUIContent(EditorGUIUtility.FindTexture("Refresh"), refreshBranchesHint);
+			RefreshBranchesContent = new GUIContent(EditorGUIUtility.FindTexture("Refresh"), Tr("branches.refresh.tooltip"));
 
 			ToolbarLabelStyle = new GUIStyle(EditorStyles.toolbarButton);
 			ToolbarLabelStyle.normal.background = null;
@@ -172,19 +173,19 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			SearchFieldCancelEmptyStyle = GUI.skin.GetStyle("ToolbarSeachCancelButtonEmpty");
 #endif
 
-			const string showLogTooltip = "Show Log in this branch at the target asset.";
-			RepoBrowserContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-RepoBrowser", "Repo-Browser in this branch at the target asset.");
+			string showLogTooltip = Tr("branches.show_log.tooltip");
+			RepoBrowserContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-RepoBrowser", Tr("branches.repo_browser.tooltip"));
 			ShowLogContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ShowLog", showLogTooltip);
-			SwitchBranchContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Switch", "Switch working copy to another branch.\nOpens TortoiseSVN dialog.");
+			SwitchBranchContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Switch", Tr("branches.switch.tooltip"));
 
-			ScanForConflictsContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ScanForConflicts", "Scan all branches for potential conflicts.\nThis will look for any changes made to the target asset in the branches.");
+			ScanForConflictsContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ScanForConflicts", Tr("branches.scan_conflicts.tooltip"));
 
-			ConflictsPendingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Pending", "Pending - waiting to be scanned for conflicts.\n\n" + showLogTooltip);
-			ConflictsFoundContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Conflicts-Found", "The target asset was modified in this branch - potential conflicts.\n\n" + showLogTooltip);
-			ConflictsNormalContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Normal", "No conflicts were found by the scan.\n\n" + showLogTooltip);
-			ConflictsAddedContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Added", "Asset was added in this branch.\n\n" + showLogTooltip);
-			ConflictsMissingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Missing", "Asset was missing. It may have been deleted or never existed in this branch.\n\n" + showLogTooltip);
-			ConflictsErrorContent = new GUIContent(EditorGUIUtility.FindTexture("console.erroricon.sml"), "Error while scanning this branch. Check the console logs for more info.\n\n" + showLogTooltip);
+			ConflictsPendingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Pending", Tr("branches.conflicts.pending") + "\n\n" + showLogTooltip);
+			ConflictsFoundContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Conflicts-Found", Tr("branches.conflicts.found") + "\n\n" + showLogTooltip);
+			ConflictsNormalContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Normal", Tr("branches.conflicts.normal") + "\n\n" + showLogTooltip);
+			ConflictsAddedContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Added", Tr("branches.conflicts.added") + "\n\n" + showLogTooltip);
+			ConflictsMissingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Missing", Tr("branches.conflicts.missing") + "\n\n" + showLogTooltip);
+			ConflictsErrorContent = new GUIContent(EditorGUIUtility.FindTexture("console.erroricon.sml"), Tr("branches.conflicts.error") + "\n\n" + showLogTooltip);
 
 			if (RepoBrowserContent.image == null) RepoBrowserContent.text = "R";
 			if (ShowLogContent.image == null) ShowLogContent.text = "L";
@@ -218,7 +219,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			BranchLabelStyle.padding = new RectOffset(4, 4, 3, 3);
 
 
-			RevisionsHintContent = new GUIContent(EditorGUIUtility.FindTexture("console.infoicon.sml"), "Scan number of revisions back from the last changed one in the checked branch.");
+			RevisionsHintContent = new GUIContent(EditorGUIUtility.FindTexture("console.infoicon.sml"), Tr("branches.scan_revisions.tooltip"));
 
 		}
 
@@ -241,16 +242,26 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			Database.DatabaseChanged -= OnDatabaseChanged;
 			Database.DatabaseChanged += OnDatabaseChanged;
 			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
+			LocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+			LocalizationManager.OnLanguageChanged += OnLanguageChanged;
 		}
 
 		private void OnDisable()
 		{
 			Database.DatabaseChanged -= OnDatabaseChanged;
 			AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+			LocalizationManager.OnLanguageChanged -= OnLanguageChanged;
 
 			if (m_ConflictsScanState != ConflictsScanState.Scanned) {
 				InvaldateConflictsScan();
 			}
+		}
+
+		private void OnLanguageChanged()
+		{
+			m_Initialized = false;
+			titleContent = new GUIContent(Tr("branches.window.title"));
+			Repaint();
 		}
 
 		void OnGUI()
@@ -288,7 +299,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 		{
 			using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar)) {
 
-				GUILayout.Label("Asset:", ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
+				GUILayout.Label(Tr("branches.asset_label"), ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
 
 				var prevColor = GUI.backgroundColor;
 				GUI.backgroundColor = m_TargetAsset == null ? new Color(0.93f, 0.40f, 0.40f) : prevColor;
@@ -312,7 +323,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 
 			using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar)) {
 
-				GUILayout.Label("Search:", ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
+				GUILayout.Label(Tr("branches.search_label"), ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
 
 				m_BranchFilter = EditorGUILayout.TextField(m_BranchFilter, SearchFieldStyle);
 
@@ -331,15 +342,15 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 
 			using (new EditorGUILayout.VerticalScope()) {
 				if (!Database.IsActive) {
-					EditorGUILayout.LabelField("To use Branch Selector, you must enable and setup\n\"Branches Database\" in the Project preferences...", GUILayout.Height(40f));
-					if (GUILayout.Button("Open Project Preferences")) {
+					EditorGUILayout.LabelField(Tr("branches.setup_required"), GUILayout.Height(40f));
+					if (GUILayout.Button(Tr("branches.open_project_prefs"))) {
 						Preferences.SVNPreferencesWindow.ShowProjectPreferences(Preferences.SVNPreferencesWindow.PreferencesTab.Project);
 					}
 
 				} else if (!Database.IsReady) {
-					EditorGUILayout.LabelField("Scanning branches for Unity projects...");
+					EditorGUILayout.LabelField(Tr("branches.scanning"));
 				} else if (m_TargetAsset == null) {
-					EditorGUILayout.LabelField("Please select target asset....");
+					EditorGUILayout.LabelField(Tr("branches.select_target"));
 				} else {
 					DrawBranchesList();
 				}
@@ -351,14 +362,14 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar)) {
 
 				using (new EditorGUI.DisabledGroupScope(m_ConflictsScanState == ConflictsScanState.Scanning)) {
-					GUILayout.Label("Conflicts:", ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
+					GUILayout.Label(Tr("branches.conflicts_label"), ToolbarTitleStyle, GUILayout.Width(ToolbarsTitleWidth));
 
-					GUILayout.Label("Show Non-Conflicts:");
+					GUILayout.Label(Tr("branches.show_non_conflicts"));
 					m_ConflictsShowNormal = EditorGUILayout.Toggle(m_ConflictsShowNormal, GUILayout.Width(28f));
 
 					var prevWidth = EditorGUIUtility.labelWidth;
 					EditorGUIUtility.labelWidth = 55f;
-					m_ConflictsScanLimitType = (ConflictsScanLimitType)EditorGUILayout.EnumPopup("Limit by: ", m_ConflictsScanLimitType, GUILayout.Width(140f));
+					m_ConflictsScanLimitType = (ConflictsScanLimitType)EditorGUILayout.EnumPopup(Tr("branches.limit_by"), m_ConflictsScanLimitType, GUILayout.Width(140f));
 					EditorGUIUtility.labelWidth = prevWidth;
 
 					if (m_ConflictsScanLimitType != ConflictsScanLimitType.Unlimited) {
@@ -373,7 +384,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 				GUILayout.FlexibleSpace();
 
 				var showStartScan = m_ConflictsScanState == ConflictsScanState.None || m_ConflictsScanState == ConflictsScanState.Scanned;
-				var scanButtonContent = showStartScan ? "Start Scan" : "Stop Scan";
+				var scanButtonContent = showStartScan ? Tr("branches.start_scan") : Tr("branches.stop_scan");
 				var prevColor = GUI.backgroundColor;
 				GUI.backgroundColor = showStartScan ? Color.green : Color.red;
 				if (GUILayout.Button( scanButtonContent, EditorStyles.toolbarButton, GUILayout.ExpandWidth(false))) {
@@ -430,21 +441,20 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 						}
 
 						if (switchBranch) {
-							bool confirm = EditorUtility.DisplayDialog("Switch Operation",
-								"Unity needs to be closed while switching. Do you want to close it?\n\n" +
-								"Reason: if Unity starts crunching assets while SVN is downloading files, the Library may get corrupted.",
-								"Yes!", "No"
+							bool confirm = EditorUtility.DisplayDialog(
+								Tr("branches.switch_op.title"),
+								Tr("branches.switch_op.msg"),
+								Tr("branches.switch_op.yes"), Tr("common.no")
 								);
 							if (confirm && UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) {
 								var localPathNative = WiseSVNIntegration.GetWorkingCopyRootPath();
 								var targetUrl = branchProject.BranchURL;
 
 								if (branchProject.BranchURL != branchProject.UnityProjectURL) {
-									bool useBranchRoot = EditorUtility.DisplayDialog("Switch what?",
-										"What do you want to switch?\n" +
-										"- Working copy root (the whole checkout)\n" +
-										"- Unity project folder",
-										"Working copy root", "Unity project");
+									bool useBranchRoot = EditorUtility.DisplayDialog(
+										Tr("branches.switch_what.title"),
+										Tr("branches.switch_what.msg"),
+										Tr("branches.switch_what.wc_root"), Tr("branches.switch_what.unity_project"));
 									if (!useBranchRoot) {
 										localPathNative = WiseSVNIntegration.ProjectRootNative;
 										targetUrl = branchProject.UnityProjectURL;
@@ -559,13 +569,12 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			private void DrawStatusBar()
 		{
 			if (Database.LastError != ListOperationResult.Success) {
-				GUILayout.Label($"Error scanning branches: {ObjectNames.NicifyVariableName(Database.LastError.ToString())}", ToolbarLabelStyle, GUILayout.ExpandWidth(false));
+				GUILayout.Label(Tr("branches.error_scanning", ObjectNames.NicifyVariableName(Database.LastError.ToString())), ToolbarLabelStyle, GUILayout.ExpandWidth(false));
 				return;
 			}
 
 			if (Database.IsUpdating) {
-				int dots = ((int)EditorApplication.timeSinceStartup) % 3;
-				GUILayout.Label($"Scanning{LoadingDots[dots]}", ToolbarLabelStyle, GUILayout.ExpandWidth(false));
+				GUILayout.Label(Tr("common.scanning"), ToolbarLabelStyle, GUILayout.ExpandWidth(false));
 
 				GUILayout.FlexibleSpace();
 
@@ -575,12 +584,12 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			}
 
 
-			GUILayout.Label($"Branches: {Database.BranchProjects.Count}", ToolbarLabelStyle, GUILayout.ExpandWidth(false));
+			GUILayout.Label(Tr("branches.count", Database.BranchProjects.Count), ToolbarLabelStyle, GUILayout.ExpandWidth(false));
 
 			if (m_ConflictsScanState != ConflictsScanState.None) {
 				GUILayout.FlexibleSpace();
 
-				GUILayout.Label($"Conflicts: {ObjectNames.NicifyVariableName(m_ConflictsScanState.ToString())}", ToolbarLabelStyle, GUILayout.ExpandWidth(false));
+				GUILayout.Label(Tr("branches.conflicts_label") + " " + ObjectNames.NicifyVariableName(m_ConflictsScanState.ToString()), ToolbarLabelStyle, GUILayout.ExpandWidth(false));
 			}
 		}
 
