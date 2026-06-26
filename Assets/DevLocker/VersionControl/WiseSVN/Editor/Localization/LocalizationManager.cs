@@ -28,6 +28,8 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 		private const string LocaleDirRelative = "Localization";
 		private const string FallbackLocaleName = "locale_en";
 
+		private static readonly object s_LockObj = new object();
+
 		private static Dictionary<string, string> s_Current = new Dictionary<string, string>();
 		private static Dictionary<string, string> s_Fallback = new Dictionary<string, string>();
 
@@ -56,19 +58,29 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 		/// <summary>Set the active language. Reloads locale data and fires OnLanguageChanged.</summary>
 		public static void SetLanguage(WiseSVNLanguage lang)
 		{
-			s_RequestedLanguage = lang;
-			s_ResolvedLanguage = (lang == WiseSVNLanguage.Auto) ? DetectSystemLanguage() : lang;
+			Dictionary<string, string> newCurrent;
+
+			lock (s_LockObj) {
+				s_RequestedLanguage = lang;
+				s_ResolvedLanguage = (lang == WiseSVNLanguage.Auto) ? DetectSystemLanguage() : lang;
+			}
 
 			EnsureFallbackLoaded();
 
 			if (s_ResolvedLanguage == WiseSVNLanguage.English) {
 				// Copy, do NOT share the dictionary reference — future reloads must not mutate fallback.
-				s_Current = new Dictionary<string, string>(s_Fallback);
+				lock (s_LockObj) {
+					newCurrent = new Dictionary<string, string>(s_Fallback);
+				}
 			} else {
-				s_Current = LoadLocale(LocaleFileName(s_ResolvedLanguage));
+				newCurrent = LoadLocale(LocaleFileName(s_ResolvedLanguage));
 			}
 
-			s_Initialized = true;
+			lock (s_LockObj) {
+				s_Current = newCurrent;
+				s_Initialized = true;
+			}
+
 			OnLanguageChanged?.Invoke();
 		}
 
@@ -79,14 +91,23 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 			if (string.IsNullOrEmpty(key))
 				return key;
 
-			if (!s_Initialized) {
-				SetLanguage(s_RequestedLanguage);
+			bool initialized;
+			WiseSVNLanguage requestedLang;
+			lock (s_LockObj) {
+				initialized = s_Initialized;
+				requestedLang = s_RequestedLanguage;
 			}
 
-			if (s_Current.TryGetValue(key, out string value))
-				return value;
-			if (s_Fallback.TryGetValue(key, out value))
-				return value;
+			if (!initialized) {
+				SetLanguage(requestedLang);
+			}
+
+			lock (s_LockObj) {
+				if (s_Current.TryGetValue(key, out string value))
+					return value;
+				if (s_Fallback.TryGetValue(key, out value))
+					return value;
+			}
 			return key;
 		}
 
@@ -121,8 +142,17 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 
 		private static void EnsureFallbackLoaded()
 		{
-			if (s_Fallback.Count == 0)
-				s_Fallback = LoadLocale(FallbackLocaleName);
+			bool needsLoad;
+			lock (s_LockObj) {
+				needsLoad = s_Fallback.Count == 0;
+			}
+			if (needsLoad) {
+				var loaded = LoadLocale(FallbackLocaleName);
+				lock (s_LockObj) {
+					if (s_Fallback.Count == 0)
+						s_Fallback = loaded;
+				}
+			}
 		}
 
 		private static Dictionary<string, string> LoadLocale(string fileNameNoExt)
@@ -159,8 +189,10 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 
 		private static string FindLocaleFilePath(string fileNameNoExt)
 		{
-			if (s_LocalePathCache.TryGetValue(fileNameNoExt, out string cached) && File.Exists(cached))
-				return cached;
+			lock (s_LockObj) {
+				if (s_LocalePathCache.TryGetValue(fileNameNoExt, out string cached) && File.Exists(cached))
+					return cached;
+			}
 
 			// Search via AssetDatabase to locate locale files no matter where the plugin lives.
 			string[] guids = AssetDatabase.FindAssets(fileNameNoExt + " t:TextAsset");
@@ -169,7 +201,9 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 				if (!assetPath.Contains("/" + LocaleDirRelative + "/")) continue;
 				if (!assetPath.EndsWith(fileNameNoExt + ".txt", StringComparison.OrdinalIgnoreCase)) continue;
 				string full = Path.Combine(Directory.GetCurrentDirectory(), assetPath);
-				s_LocalePathCache[fileNameNoExt] = full;
+				lock (s_LockObj) {
+					s_LocalePathCache[fileNameNoExt] = full;
+				}
 				return full;
 			}
 			return null;
@@ -201,9 +235,13 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 		/// <summary>Force reload of the active locale; useful after editing locale files.</summary>
 		public static void Reload()
 		{
-			s_Fallback.Clear();
-			s_Initialized = false;
-			SetLanguage(s_RequestedLanguage);
+			WiseSVNLanguage lang;
+			lock (s_LockObj) {
+				s_Fallback = new Dictionary<string, string>();
+				s_Initialized = false;
+				lang = s_RequestedLanguage;
+			}
+			SetLanguage(lang);
 		}
 	}
 }
