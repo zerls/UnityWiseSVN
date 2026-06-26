@@ -113,8 +113,12 @@ fi
 echo "==> Committing: $COMMIT_MSG"
 if [ "$DRY_RUN" = false ]; then
     git add "$PACKAGE_JSON" "$CHANGELOG"
-    git commit -m "$COMMIT_MSG"
-    echo "  Committed."
+    if ! git diff --cached --quiet; then
+        git commit -m "$COMMIT_MSG"
+        echo "  Committed."
+    else
+        echo "  Nothing to commit (version already at $VERSION)."
+    fi
 else
     echo "  (dry-run) Would: git add && git commit -m \"$COMMIT_MSG\""
 fi
@@ -122,8 +126,12 @@ fi
 # ---------- Step 4: Tag ----------
 echo "==> Creating tag: $TAG"
 if [ "$DRY_RUN" = false ]; then
-    git tag "$TAG" -m "$COMMIT_MSG"
-    echo "  Tagged."
+    if git rev-parse "$TAG" >/dev/null 2>&1; then
+        echo "  Tag $TAG already exists — skipping."
+    else
+        git tag "$TAG" -m "$COMMIT_MSG"
+        echo "  Tagged."
+    fi
 else
     echo "  (dry-run) Would: git tag $TAG"
 fi
@@ -139,7 +147,10 @@ echo "==> Pushing subtree to origin upm"
 if [ "$DRY_RUN" = true ]; then
     echo "  (dry-run) Would: git subtree push --prefix $SUBTREE_PREFIX origin upm"
 elif [ "$NO_PUSH" = true ]; then
-    echo "  (--no-push) Skipped"
+    echo "  (--no-push) Building local upm branch instead..."
+    git subtree split --prefix "$SUBTREE_PREFIX" -b upm 2>/dev/null \
+        && echo "  Local branch 'upm' created/updated." \
+        || { git branch -D upm 2>/dev/null; git subtree split --prefix "$SUBTREE_PREFIX" -b upm && echo "  Local branch 'upm' recreated."; }
 else
     if ! git subtree push --prefix "$SUBTREE_PREFIX" origin upm; then
         echo "  ERROR: subtree push failed."
