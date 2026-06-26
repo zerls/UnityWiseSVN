@@ -56,6 +56,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public WiseSVNLanguage Language = WiseSVNLanguage.Auto;
 
 			public WiseSVNIconStyle IconStyle = WiseSVNIconStyle.Classic;
+			public string TortoiseSVNTheme = "Win10";
 
 #if UNITY_2020_2_OR_NEWER
 			[NonReorderable]
@@ -276,34 +277,158 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		private void LoadTextures()
 		{
-			bool modern = PersonalPrefs.IconStyle == WiseSVNIconStyle.Modern;
+			bool tortoise = PersonalPrefs.IconStyle == WiseSVNIconStyle.TortoiseSVN;
+			string iconsDir = tortoise ? GetTortoiseOverlaysIconsDir() : string.Empty;
+			string theme = PersonalPrefs.TortoiseSVNTheme;
 
 			FileStatusIcons = new GUIContent[Enum.GetValues(typeof(VCFileStatus)).Length];
-			FileStatusIcons[(int)VCFileStatus.Normal]      = modern ? LoadBuiltinIcon("d_Valid",               null)                                                    : LoadTexture("SVNOverlayIcons/SVNNormalIcon");
-			FileStatusIcons[(int)VCFileStatus.Added]       = modern ? LoadBuiltinIcon("d_Toolbar Plus",        null)                                                    : LoadTexture("SVNOverlayIcons/SVNAddedIcon");
-			FileStatusIcons[(int)VCFileStatus.Modified]    = modern ? LoadBuiltinIcon("d_console.warnicon.sml",null)                                                    : LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
-			FileStatusIcons[(int)VCFileStatus.Replaced]    = modern ? LoadBuiltinIcon("d_console.warnicon.sml",null)                                                    : LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
-			FileStatusIcons[(int)VCFileStatus.Deleted]     = modern ? LoadBuiltinIcon("d_TreeEditor.Trash",    null)                                                    : LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
-			FileStatusIcons[(int)VCFileStatus.Conflicted]  = modern ? LoadBuiltinIcon("d_console.erroricon.sml",null)                                                   : LoadTexture("SVNOverlayIcons/SVNConflictIcon");
-			FileStatusIcons[(int)VCFileStatus.Ignored]     = modern ? LoadBuiltinIcon("d_Invalid",             LocalizationManager.Tr("overlay.tooltip.ignored"))      : LoadTexture("SVNOverlayIcons/SVNIgnoredIcon",     LocalizationManager.Tr("overlay.tooltip.ignored"));
-			FileStatusIcons[(int)VCFileStatus.Unversioned] = modern ? LoadBuiltinIcon("d_PreTextureRGB",       null)                                                    : LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
-			FileStatusIcons[(int)VCFileStatus.Excluded]    = modern ? LoadBuiltinIcon("d_Invalid",             LocalizationManager.Tr("overlay.tooltip.excluded"))     : LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon",    LocalizationManager.Tr("overlay.tooltip.excluded"));
+			FileStatusIcons[(int)VCFileStatus.Normal]      = TryTortoiseIcon(tortoise, iconsDir, theme, "NormalIcon.ico",      null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNNormalIcon");
+			FileStatusIcons[(int)VCFileStatus.Added]       = TryTortoiseIcon(tortoise, iconsDir, theme, "AddedIcon.ico",       null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNAddedIcon");
+			FileStatusIcons[(int)VCFileStatus.Modified]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ModifiedIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
+			FileStatusIcons[(int)VCFileStatus.Replaced]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ModifiedIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
+			FileStatusIcons[(int)VCFileStatus.Deleted]     = TryTortoiseIcon(tortoise, iconsDir, theme, "DeletedIcon.ico",     null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
+			FileStatusIcons[(int)VCFileStatus.Conflicted]  = TryTortoiseIcon(tortoise, iconsDir, theme, "ConflictIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNConflictIcon");
+			FileStatusIcons[(int)VCFileStatus.Ignored]     = TryTortoiseIcon(tortoise, iconsDir, theme, "IgnoredIcon.ico",     LocalizationManager.Tr("overlay.tooltip.ignored"))     ?? LoadTexture("SVNOverlayIcons/SVNIgnoredIcon",     LocalizationManager.Tr("overlay.tooltip.ignored"));
+			FileStatusIcons[(int)VCFileStatus.Unversioned] = TryTortoiseIcon(tortoise, iconsDir, theme, "UnversionedIcon.ico", null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
+			FileStatusIcons[(int)VCFileStatus.Excluded]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ReadOnlyIcon.ico",    LocalizationManager.Tr("overlay.tooltip.excluded"))    ?? LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon",    LocalizationManager.Tr("overlay.tooltip.excluded"));
 
 			LockStatusIcons = new GUIContent[Enum.GetValues(typeof(VCLockStatus)).Length];
-			LockStatusIcons[(int)VCLockStatus.LockedHere]       = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_here"))   : LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon",  LocalizationManager.Tr("overlay.tooltip.locked_here"));
-			LockStatusIcons[(int)VCLockStatus.BrokenLock]       = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.broken_lock"))   : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
-			LockStatusIcons[(int)VCLockStatus.LockedOther]      = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_other"))  : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
-			LockStatusIcons[(int)VCLockStatus.LockedButStolen]  = modern ? LoadBuiltinIcon("d_Locked",        LocalizationManager.Tr("overlay.tooltip.locked_stolen")) : LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
+			LockStatusIcons[(int)VCLockStatus.LockedHere]      = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.locked_here"))  ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon",  LocalizationManager.Tr("overlay.tooltip.locked_here"));
+			LockStatusIcons[(int)VCLockStatus.BrokenLock]      = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.broken_lock"))  ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
+			LockStatusIcons[(int)VCLockStatus.LockedOther]     = TryTortoiseIcon(tortoise, iconsDir, theme, "ReadOnlyIcon.ico",LocalizationManager.Tr("overlay.tooltip.locked_other")) ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
+			LockStatusIcons[(int)VCLockStatus.LockedButStolen] = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.locked_stolen")) ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
 
-			RemoteStatusIcons = modern
-				? LoadBuiltinIcon("d_Download-Available@2x", LocalizationManager.Tr("overlay.tooltip.remote_changes"))
-				: LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
+			// TortoiseOverlays has no remote-changes icon; always use the bundled PNG.
+			RemoteStatusIcons = LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
 		}
 
-		private static GUIContent LoadBuiltinIcon(string iconName, string tooltip)
+		// Returns a GUIContent loaded from TortoiseOverlays, or null if unavailable (falls back to Classic).
+		private static GUIContent TryTortoiseIcon(bool tortoise, string iconsDir, string theme, string iconFile, string tooltip)
 		{
-			var content = EditorGUIUtility.IconContent(iconName);
-			return content != null ? new GUIContent(content.image, tooltip) : GUIContent.none;
+			if (!tortoise || string.IsNullOrEmpty(iconsDir)) return null;
+			string path = Path.Combine(iconsDir, theme, iconFile);
+			if (!File.Exists(path)) return null;
+
+			try {
+				byte[] data = File.ReadAllBytes(path);
+				var tex = ExtractBestImageFromIco(data);
+				if (tex != null) {
+					tex.filterMode = FilterMode.Bilinear;
+					return new GUIContent(tex, tooltip);
+				}
+			} catch (Exception ex) {
+				Debug.LogWarning($"[WiseSVN] Failed to load TortoiseSVN icon {path}: {ex.Message}");
+			}
+			return null;
+		}
+
+		// Reads the directory at %CommonProgramFiles%\TortoiseOverlays\icons\.
+		public static string GetTortoiseOverlaysIconsDir()
+		{
+#if UNITY_EDITOR_WIN
+			string commonFiles = Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles);
+			string path = Path.Combine(commonFiles, "TortoiseOverlays", "icons");
+			if (Directory.Exists(path)) return path;
+			string commonFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFilesX86);
+			if (!string.IsNullOrEmpty(commonFilesX86)) {
+				string pathX86 = Path.Combine(commonFilesX86, "TortoiseOverlays", "icons");
+				if (Directory.Exists(pathX86)) return pathX86;
+			}
+#endif
+			return string.Empty;
+		}
+
+		// Returns sorted list of theme folder names available in TortoiseOverlays (e.g. "Win10", "Flat", ...).
+		public static string[] GetAvailableTortoiseThemes()
+		{
+			string iconsDir = GetTortoiseOverlaysIconsDir();
+			if (string.IsNullOrEmpty(iconsDir)) return new string[0];
+			return Directory.GetDirectories(iconsDir)
+				.Select(Path.GetFileName)
+				.OrderBy(n => n)
+				.ToArray();
+		}
+
+		// Parses a .ico file and returns the best available image as a Texture2D.
+		// Prefers embedded PNG (e.g. 256×256 in Win10/Flat themes); falls back to 32bpp BMP DIB.
+		private static Texture2D ExtractBestImageFromIco(byte[] data)
+		{
+			if (data == null || data.Length < 6) return null;
+
+			int count = data[4] | (data[5] << 8);
+			if (count == 0) return null;
+
+			int bestPngOffset = -1, bestPngSize = 0, bestPngW = 0;
+			int bestBmpOffset = -1, bestBmpW = 0, bestBmpBpp = 0;
+
+			for (int i = 0; i < count; i++) {
+				int e = 6 + i * 16;
+				if (e + 16 > data.Length) break;
+
+				int w        = data[e] == 0 ? 256 : data[e];
+				int dataSize = data[e+8]  | (data[e+9] <<8) | (data[e+10]<<16) | (data[e+11]<<24);
+				int imgOff   = data[e+12] | (data[e+13]<<8) | (data[e+14]<<16) | (data[e+15]<<24);
+				if (imgOff + 4 > data.Length) continue;
+
+				bool isPng = data[imgOff]==0x89 && data[imgOff+1]==0x50 && data[imgOff+2]==0x4E && data[imgOff+3]==0x47;
+				if (isPng) {
+					if (w > bestPngW) { bestPngW = w; bestPngOffset = imgOff; bestPngSize = dataSize; }
+				} else if (imgOff + 16 <= data.Length) {
+					int bpp = data[imgOff+14] | (data[imgOff+15] << 8); // biBitCount at offset 14 in BITMAPINFOHEADER
+					if (bpp == 32 && (bestBmpBpp < 32 || w > bestBmpW)) {
+						bestBmpOffset = imgOff; bestBmpW = w; bestBmpBpp = bpp;
+					} else if (bestBmpBpp < 32 && w > bestBmpW) {
+						bestBmpOffset = imgOff; bestBmpW = w; bestBmpBpp = bpp;
+					}
+				}
+			}
+
+			// Prefer embedded PNG
+			if (bestPngOffset >= 0) {
+				byte[] png = new byte[bestPngSize];
+				Array.Copy(data, bestPngOffset, png, 0, bestPngSize);
+				var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+				if (tex.LoadImage(png)) return tex;
+				UnityEngine.Object.DestroyImmediate(tex);
+			}
+
+			// Fall back to 32bpp BMP DIB
+			if (bestBmpOffset >= 0 && bestBmpBpp == 32)
+				return ParseDib32(data, bestBmpOffset, bestBmpW);
+
+			return null;
+		}
+
+		// Parses a 32bpp BMP DIB (as embedded in an ICO) into a Texture2D.
+		// In ICO format the BITMAPINFOHEADER.biHeight is doubled (pixel rows + AND mask rows).
+		private static Texture2D ParseDib32(byte[] data, int offset, int width)
+		{
+			int biSize   = data[offset] | (data[offset+1]<<8) | (data[offset+2]<<16) | (data[offset+3]<<24);
+			// biHeight is a signed 32-bit integer; C# integer shifts already propagate sign via the high byte.
+			int biHeight = data[offset+8] | (data[offset+9]<<8) | (data[offset+10]<<16) | (data[offset+11]<<24);
+			bool topDown     = biHeight < 0;
+			int actualHeight = Math.Abs(biHeight) / 2; // doubled in ICO: pixel-rows + AND-mask rows
+			if (actualHeight <= 0) actualHeight = width;
+
+			int pixelBase = offset + biSize;
+			int stride    = width * 4;
+
+			var pixels = new Color32[width * actualHeight];
+			for (int row = 0; row < actualHeight; row++) {
+				int srcRow  = topDown ? row : (actualHeight - 1 - row); // BMP rows are bottom-up by default
+				int srcBase = pixelBase + srcRow * stride;
+				int dstBase = row * width;
+				for (int col = 0; col < width; col++) {
+					int src = srcBase + col * 4;
+					if (src + 3 >= data.Length) { pixels[dstBase + col] = new Color32(0, 0, 0, 0); continue; }
+					pixels[dstBase + col] = new Color32(data[src+2], data[src+1], data[src], data[src+3]); // BGRA→RGBA
+				}
+			}
+
+			var tex = new Texture2D(width, actualHeight, TextureFormat.RGBA32, false, true);
+			tex.SetPixels32(pixels);
+			tex.Apply(false, false);
+			return tex;
 		}
 
 		public static GUIContent LoadTexture(string path, string tooltip = null)

@@ -80,8 +80,8 @@ namespace DevLocker.VersionControl.WiseSVN
 
 	public enum WiseSVNIconStyle
 	{
-		Classic = 0,    // TortoiseSVN-style PNG icons (original set)
-		Modern = 1,     // Unity built-in editor icons (theme-aware)
+		Classic = 0,     // Bundled PNG overlay icons (original TortoiseSVN Classic set)
+		TortoiseSVN = 1, // Load from TortoiseOverlays installation (Windows only; falls back to Classic)
 	}
 
 	public enum LockOperationResult
