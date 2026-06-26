@@ -262,6 +262,9 @@ ignoremgr.unsaved_changes.title=Unsaved Changes
 ignoremgr.unsaved_changes.msg=You have pending pattern changes. Apply them now?
 ignoremgr.apply_success=Ignore patterns updated successfully.
 ignoremgr.apply_failed=Failed to update ignore patterns. Check the console logs.
+ignoremgr.apply_failed_detail=Failed to update ignore patterns for: {0}
+ignoremgr.empty_patterns=(empty)
+ignoremgr.refresh_failed=Refresh failed:
 ignoremgr.versioned_warn.title=Pattern Targets Versioned File
 ignoremgr.versioned_warn.msg=The pattern \"{0}\" matches a file that is already versioned. SVN ignores only apply to unversioned files. The pattern will be added, but you may also need to mark the file deleted in SVN to fully ignore it.
 

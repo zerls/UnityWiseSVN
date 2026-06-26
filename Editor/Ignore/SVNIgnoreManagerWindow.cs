@@ -42,6 +42,9 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 		private bool m_IsScanning = false;
 		private string m_StatusMessage = string.Empty;
 
+		private SVNAsyncOperation<(List<PropgetEntry> local, List<PropgetEntry> global)> m_RefreshOp;
+		private SVNAsyncOperation<List<PropgetEntry>> m_AddOp;
+
 		// MenuItem attribute is registered on SVNContextMenusManager.ShowIgnoreManager (keeps menu-priority constants centralized).
 		public static void Open()
 		{
@@ -86,8 +89,10 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 
 			var refreshIcon = EditorGUIUtility.IconContent("d_Refresh");
 			var refreshContent = new GUIContent(Tr("ignoremgr.toolbar.refresh"), refreshIcon.image, Tr("ignoremgr.toolbar.refresh.tooltip"));
-			if (GUILayout.Button(refreshContent, EditorStyles.toolbarButton, GUILayout.MaxWidth(100f))) {
-				RefreshDirectoryList();
+			using (new EditorGUI.DisabledScope(m_IsScanning)) {
+				if (GUILayout.Button(refreshContent, EditorStyles.toolbarButton, GUILayout.MaxWidth(100f))) {
+					RefreshDirectoryList();
+				}
 			}
 
 			bool anyDirty = m_Dirs.Any(d => d.Dirty);
@@ -141,7 +146,7 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 					? AssetDatabase.GUIDToAssetPath(Selection.assetGUIDs[0])
 					: null;
 				string targetDir = ResolveTargetDirectory(selectedAsset);
-				bool canAdd = !string.IsNullOrEmpty(targetDir) && !m_Dirs.Any(d => d.RelativePath == targetDir);
+				bool canAdd = !string.IsNullOrEmpty(targetDir) && !m_Dirs.Any(d => d.RelativePath == targetDir) && m_AddOp == null;
 
 				using (new EditorGUI.DisabledScope(!canAdd)) {
 					var plusContent = new GUIContent("+ " + (targetDir ?? Tr("common.add")), Tr("ignoremgr.add_directory"));
@@ -181,7 +186,7 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 			EditorGUILayout.LabelField(Tr("ignoremgr.section.local"), EditorStyles.boldLabel);
 
 			if (d.LocalPatterns.Count == 0) {
-				EditorGUILayout.LabelField("(empty)", EditorStyles.miniLabel);
+				EditorGUILayout.LabelField(Tr("ignoremgr.empty_patterns"), EditorStyles.miniLabel);
 			} else {
 				for (int i = 0; i < d.LocalPatterns.Count; i++) {
 					EditorGUILayout.BeginHorizontal();
@@ -206,7 +211,7 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 			using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(m_NewPatternBuffer))) {
 				if (GUILayout.Button(new GUIContent(Tr("ignoremgr.add_pattern_btn"), EditorGUIUtility.IconContent("d_Toolbar Plus").image), GUILayout.MaxWidth(80f))) {
 					string p = m_NewPatternBuffer.Trim();
-					if (!string.IsNullOrEmpty(p) && !d.LocalPatterns.Contains(p)) {
+					if (!string.IsNullOrEmpty(p) && !d.LocalPatterns.Any(x => string.Equals(x, p, StringComparison.OrdinalIgnoreCase))) {
 						d.LocalPatterns.Add(p);
 						d.Dirty = true;
 					}
@@ -253,42 +258,44 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 
 		private void RefreshDirectoryList()
 		{
+			if (m_RefreshOp != null) return;
+
 			m_IsScanning = true;
 			m_StatusMessage = Tr("common.scanning");
 			m_Dirs.Clear();
+			Repaint();
 
-			try {
-				// Use SVNStatusesDatabase already-collected paths to seed; if empty, fall back to scanning
-				// just "Assets" + "Packages" via Propget on the project root recursively.
-				var collected = new HashSet<string>();
+			string rootNative = WiseSVNIntegration.ProjectRootNative;
+			int timeout = WiseSVNIntegration.COMMAND_TIMEOUT;
 
-				// Recursive propget on project root for svn:ignore — fast and authoritative.
+			m_RefreshOp = SVNAsyncOperation<(List<PropgetEntry> local, List<PropgetEntry> global)>.Start(_ => {
 				var localEntries = new List<PropgetEntry>();
-				WiseSVNIntegration.Propget(WiseSVNIntegration.ProjectRootNative, LocalProp, true, localEntries, WiseSVNIntegration.COMMAND_TIMEOUT, null);
-
-				foreach (var e in localEntries) {
-					if (string.IsNullOrEmpty(e.Value)) continue;
-					AddOrUpdateDir(e.Path, e.Value, isGlobal: false, collected);
-				}
-
-				// Recursive propget for svn:global-ignores — populate read-only sections.
+				WiseSVNIntegration.Propget(rootNative, LocalProp, true, localEntries, timeout, null);
 				var globalEntries = new List<PropgetEntry>();
-				WiseSVNIntegration.Propget(WiseSVNIntegration.ProjectRootNative, GlobalProp, true, globalEntries, WiseSVNIntegration.COMMAND_TIMEOUT, null);
+				WiseSVNIntegration.Propget(rootNative, GlobalProp, true, globalEntries, timeout, null);
+				return (localEntries, globalEntries);
+			});
 
-				foreach (var e in globalEntries) {
-					if (string.IsNullOrEmpty(e.Value)) continue;
-					AddOrUpdateDir(e.Path, e.Value, isGlobal: true, collected);
+			m_RefreshOp.Completed += op => {
+				m_RefreshOp = null;
+				m_IsScanning = false;
+
+				if (!string.IsNullOrEmpty(op.FinishedError)) {
+					m_StatusMessage = Tr("ignoremgr.refresh_failed") + " " + op.FinishedError;
+				} else {
+					var collected = new HashSet<string>();
+					foreach (var e in op.Result.local) {
+						if (!string.IsNullOrEmpty(e.Value)) AddOrUpdateDir(e.Path, e.Value, false, collected);
+					}
+					foreach (var e in op.Result.global) {
+						if (!string.IsNullOrEmpty(e.Value)) AddOrUpdateDir(e.Path, e.Value, true, collected);
+					}
+					m_StatusMessage = string.Empty;
 				}
 
-				m_StatusMessage = string.Empty;
-			} catch (Exception ex) {
-				m_StatusMessage = "Refresh failed: " + ex.Message;
-				Debug.LogException(ex);
-			} finally {
-				m_IsScanning = false;
 				if (m_SelectedDir >= m_Dirs.Count) m_SelectedDir = -1;
 				Repaint();
-			}
+			};
 		}
 
 		private void AddOrUpdateDir(string absolutePath, string rawValue, bool isGlobal, HashSet<string> visited)
@@ -327,32 +334,41 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 		{
 			if (string.IsNullOrEmpty(relativePath)) return;
 			if (m_Dirs.Any(d => d.RelativePath == relativePath)) return;
+			if (m_AddOp != null) return;
 
 			string nativeRoot = WiseSVNIntegration.ProjectRootNative;
 			string abs = Path.Combine(nativeRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
-			var entry = new DirEntry {
-				RelativePath = relativePath,
-				AbsolutePath = abs,
-			};
-
-			// Load existing svn:ignore for this dir so users see what's there.
-			var local = new List<PropgetEntry>();
-			WiseSVNIntegration.Propget(abs, LocalProp, false, local, WiseSVNIntegration.COMMAND_TIMEOUT, null);
-			if (local.Count > 0 && !string.IsNullOrEmpty(local[0].Value)) {
-				entry.LocalPatterns = local[0].Value
-					.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-					.Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-			}
-
+			// Add stub immediately for instant visual feedback; populate patterns asynchronously.
+			var entry = new DirEntry { RelativePath = relativePath, AbsolutePath = abs };
 			m_Dirs.Add(entry);
 			m_SelectedDir = m_Dirs.Count - 1;
+			Repaint();
+
+			int timeout = WiseSVNIntegration.COMMAND_TIMEOUT;
+
+			m_AddOp = SVNAsyncOperation<List<PropgetEntry>>.Start(_ => {
+				var local = new List<PropgetEntry>();
+				WiseSVNIntegration.Propget(abs, LocalProp, false, local, timeout, null);
+				return local;
+			});
+
+			m_AddOp.Completed += op => {
+				m_AddOp = null;
+				var local = op.Result;
+				if (local != null && local.Count > 0 && !string.IsNullOrEmpty(local[0].Value)) {
+					entry.LocalPatterns = local[0].Value
+						.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+						.Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+				}
+				Repaint();
+			};
 		}
 
 		private void ApplyAllChanges()
 		{
 			int success = 0;
-			int failed = 0;
+			var failedDirs = new List<string>();
 
 			using (var reporter = WiseSVNIntegration.CreateReporter()) {
 				foreach (var d in m_Dirs) {
@@ -370,17 +386,17 @@ namespace DevLocker.VersionControl.WiseSVN.Ignore
 						d.Dirty = false;
 						success++;
 					} else {
-						failed++;
+						failedDirs.Add(d.RelativePath);
 					}
 				}
 			}
 
-			if (failed == 0 && success > 0) {
+			if (failedDirs.Count == 0 && success > 0) {
 				m_StatusMessage = Tr("ignoremgr.apply_success");
 				SVNStatusesDatabase.Instance.m_GlobalIgnoresCollected = false;
 				SVNStatusesDatabase.Instance.InvalidateDatabase();
-			} else if (failed > 0) {
-				m_StatusMessage = Tr("ignoremgr.apply_failed");
+			} else if (failedDirs.Count > 0) {
+				m_StatusMessage = Tr("ignoremgr.apply_failed_detail", string.Join(", ", failedDirs));
 			}
 
 			Repaint();

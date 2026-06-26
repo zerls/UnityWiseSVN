@@ -262,6 +262,9 @@ ignoremgr.unsaved_changes.title=未保存的更改
 ignoremgr.unsaved_changes.msg=有待保存的模式更改，要立即应用吗？
 ignoremgr.apply_success=忽略模式已更新成功。
 ignoremgr.apply_failed=忽略模式更新失败，请查看控制台日志。
+ignoremgr.apply_failed_detail=以下目录忽略模式更新失败：{0}
+ignoremgr.empty_patterns=（空）
+ignoremgr.refresh_failed=刷新失败：
 ignoremgr.versioned_warn.title=模式匹配到已版本化文件
 ignoremgr.versioned_warn.msg=模式 "{0}" 匹配到一个已纳入版本控制的文件。SVN 忽略只对未版本化文件生效。模式仍会被添加，但你可能还需要将该文件标记为删除才能真正忽略。
 
