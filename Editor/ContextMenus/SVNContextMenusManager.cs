@@ -266,6 +266,19 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.Update(assetPaths, includeMeta, wait: false);
 		}
 
+		// Update the currently selected assets in the Project window.
+		// Falls back to UpdateAll() when nothing is selected.
+		public static void UpdateSelected()
+		{
+			var paths = GetSelectedAssetPaths().ToList();
+			if (paths.Count == 0) { UpdateAll(); return; }
+
+			m_Integration?.Update(paths, true, wait: true);
+			AssetDatabase.Refresh();
+		}
+
+		public static bool HasSelectedAssets() => GetSelectedAssetPaths().Any();
+
 
 
 		[MenuItem("Assets/SVN/\u2197  Commit All %&s", false, MenuItemPriorityStart + 40)]
