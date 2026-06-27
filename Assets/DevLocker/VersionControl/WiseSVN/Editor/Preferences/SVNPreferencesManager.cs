@@ -2,6 +2,7 @@
 
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
 using DevLocker.VersionControl.WiseSVN.Localization;
+using DevLocker.VersionControl.WiseSVN.Providers;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,6 +50,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public bool AskOnMovingFolders = true;
 
 			public int AutoRefreshDatabaseInterval = 60;    // seconds; Less than 0 will disable it.
+			public bool RefreshDatabaseOnFocus = true;      // Refresh statuses when Unity regains focus (closes the gap when user works in TortoiseSVN/CLI externally).
+			public bool PreferTSVNCache = true;             // Windows-only: query TortoiseSVN's TSVNCache.exe via named pipe instead of running `svn status` ourselves.
 			public ContextMenusClient ContextMenusClient = ContextMenusClient.TortoiseSVN;
 			public SVNTraceLogs TraceLogs = SVNTraceLogs.SVNOperations;
 
@@ -59,13 +62,28 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public string TortoiseSVNTheme = "Win10";
 
 			// Status badge display locations (each independently toggled).
-			public bool ShowSVNStatusOverlay  = true;   // Floating SceneView overlay panel
-			public bool ShowSVNStatusToolbar  = true;   // SceneView toolbar item
+			public bool ShowSVNStatusToolbar  = true;   // Unity main toolbar (top bar)
 			public bool ShowSVNStatusTitleBar = false;  // Windows title bar (Win32, experimental)
+			public bool ShowSVNStatusSceneView = false; // Large semi-transparent branch name in SceneView (opt-in)
 
-			// Badge color: adaptive changes color based on SVN state; fixed uses SVNStatusBadgeColor.
-			public bool AdaptiveSVNStatusColor = true;
-			public Color SVNStatusBadgeColor = new Color(0.18f, 0.38f, 0.62f, 1f);
+			// SceneView label appearance.
+			public int   SceneViewBranchFontSize = 22;
+			public float SceneViewBranchAlpha    = 0.45f;
+
+			// Badge color: when AdaptiveSVNStatusColor is on, the badge is colored by the first
+			// matching branch-name pattern in BranchColorRules (falling back to DefaultBranchColor).
+			// Conflict state always overrides to red on the toolbar badge as a safety alert.
+			// When off, SVNStatusBadgeColor is used everywhere.
+			public bool  AdaptiveSVNStatusColor = true;
+			public Color SVNStatusBadgeColor    = new Color(0.18f, 0.38f, 0.62f, 1f);
+
+			public List<SVNBranchColorRule> BranchColorRules = new List<SVNBranchColorRule> {
+				new SVNBranchColorRule { Pattern = @"^(trunk|main|master)$", Color = new Color(0.15f, 0.50f, 0.28f, 1f) }, // green – mainline
+				new SVNBranchColorRule { Pattern = @"feature",                Color = new Color(0.18f, 0.40f, 0.65f, 1f) }, // blue – feature
+				new SVNBranchColorRule { Pattern = @"(release|pubver)",       Color = new Color(0.55f, 0.30f, 0.70f, 1f) }, // purple – release
+				new SVNBranchColorRule { Pattern = @"(hotfix|bugfix|patch)",  Color = new Color(0.75f, 0.30f, 0.10f, 1f) }, // orange-red – hotfix
+			};
+			public Color DefaultBranchColor = new Color(0.35f, 0.35f, 0.40f, 1f);
 
 #if UNITY_2020_2_OR_NEWER
 			[NonReorderable]
@@ -78,6 +96,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			{
 				var clone = (PersonalPreferences) MemberwiseClone();
 				clone.Exclude = new List<string>(Exclude);
+				clone.BranchColorRules = BranchColorRules.Select(r =>
+					new SVNBranchColorRule { Pattern = r.Pattern, Color = r.Color }).ToList();
 				return clone;
 			}
 		}
@@ -166,6 +186,38 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			? ProjectPrefs.DownloadRepositoryChanges
 			: PersonalPrefs.DownloadRepositoryChanges == BoolPreference.Enabled;
 
+
+		// Active status provider — TSVNCache on Windows (when available + preferred), CLI fallback otherwise.
+		// Resolved lazily on first access, then cached for the session.
+		private ISVNStatusProvider m_StatusProvider;
+		private string m_StatusProviderProbeMessage;  // populated when TSVNCache probe fails — shown in diagnostic UI
+		public ISVNStatusProvider StatusProvider {
+			get {
+				if (m_StatusProvider == null) {
+					m_StatusProvider = ResolveStatusProvider();
+				}
+				return m_StatusProvider;
+			}
+		}
+		public string StatusProviderProbeMessage => m_StatusProviderProbeMessage;
+
+		private ISVNStatusProvider ResolveStatusProvider()
+		{
+#if UNITY_EDITOR_WIN
+			if (PersonalPrefs != null && PersonalPrefs.PreferTSVNCache) {
+				if (TSVNCacheStatusProvider.Probe(out var reason)) {
+					Debug.Log("[WiseSVN] Status source: TSVNCache (TortoiseSVN's shared cache).");
+					m_StatusProviderProbeMessage = "Connected.";
+					return new TSVNCacheStatusProvider();
+				}
+				m_StatusProviderProbeMessage = reason;
+				Debug.Log($"[WiseSVN] TSVNCache unavailable ({reason}); using CLI status database fallback.");
+			}
+#else
+			m_StatusProviderProbeMessage = "TSVNCache is Windows-only.";
+#endif
+			return new CLIDatabaseStatusProvider();
+		}
 
 		public override void Initialize(bool freshlyCreated)
 		{
@@ -296,6 +348,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			FileStatusIcons[(int)VCFileStatus.Modified]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ModifiedIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
 			FileStatusIcons[(int)VCFileStatus.Replaced]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ModifiedIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNModifiedIcon");
 			FileStatusIcons[(int)VCFileStatus.Deleted]     = TryTortoiseIcon(tortoise, iconsDir, theme, "DeletedIcon.ico",     null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNDeletedIcon");
+			// Missing reuses the Deleted icon — TortoiseOverlays has no separate "missing" art,
+			// and in Explorer missing files visually match deleted ones. Tooltip distinguishes them.
+			FileStatusIcons[(int)VCFileStatus.Missing]     = TryTortoiseIcon(tortoise, iconsDir, theme, "DeletedIcon.ico",     LocalizationManager.Tr("overlay.tooltip.missing"))     ?? LoadTexture("SVNOverlayIcons/SVNDeletedIcon",     LocalizationManager.Tr("overlay.tooltip.missing"));
 			FileStatusIcons[(int)VCFileStatus.Conflicted]  = TryTortoiseIcon(tortoise, iconsDir, theme, "ConflictIcon.ico",    null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNConflictIcon");
 			FileStatusIcons[(int)VCFileStatus.Ignored]     = TryTortoiseIcon(tortoise, iconsDir, theme, "IgnoredIcon.ico",     LocalizationManager.Tr("overlay.tooltip.ignored"))     ?? LoadTexture("SVNOverlayIcons/SVNIgnoredIcon",     LocalizationManager.Tr("overlay.tooltip.ignored"));
 			FileStatusIcons[(int)VCFileStatus.Unversioned] = TryTortoiseIcon(tortoise, iconsDir, theme, "UnversionedIcon.ico", null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");

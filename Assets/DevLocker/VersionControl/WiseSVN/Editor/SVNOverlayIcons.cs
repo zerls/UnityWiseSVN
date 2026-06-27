@@ -33,7 +33,8 @@ namespace DevLocker.VersionControl.WiseSVN
 		static SVNOverlayIcons()
 		{
 			SVNPreferencesManager.Instance.PreferencesChanged += PreferencesChanged;
-			SVNStatusesDatabase.Instance.DatabaseChanged += OnDatabaseChanged;
+			// Subscribe to whichever status source is currently active (TSVNCache or CLI database).
+			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += OnDatabaseChanged;
 
 			PreferencesChanged();
 		}
@@ -115,7 +116,7 @@ namespace DevLocker.VersionControl.WiseSVN
 		{
 			if (string.IsNullOrEmpty(guid) || guid.StartsWith("00000000", StringComparison.Ordinal)) {
 
-				if (SVNStatusesDatabase.Instance.DataIsIncomplete && guid.Equals(SVNStatusesDatabase.ASSETS_FOLDER_GUID, StringComparison.OrdinalIgnoreCase)) {
+				if (SVNPreferencesManager.Instance.StatusProvider.DataIsIncomplete && guid.Equals(SVNStatusesDatabase.ASSETS_FOLDER_GUID, StringComparison.OrdinalIgnoreCase)) {
 
 					var iconRect = new Rect(selectionRect);
 					iconRect.height = 20;
@@ -132,7 +133,9 @@ namespace DevLocker.VersionControl.WiseSVN
 				return;
 			}
 
-			var statusData = SVNStatusesDatabase.Instance.GetKnownStatusData(guid);
+			// Route through the active status provider — TSVNCache on Windows when available, CLI database otherwise.
+			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+			var statusData = SVNPreferencesManager.Instance.StatusProvider.GetStatus(assetPath);
 
 			var downloadRepositoryChanges = SVNPreferencesManager.Instance.DownloadRepositoryChanges && !SVNPreferencesManager.Instance.NeedsToAuthenticate;
 			var lockPrompt = SVNPreferencesManager.Instance.ProjectPrefs.EnableLockPrompt;
@@ -214,17 +217,21 @@ namespace DevLocker.VersionControl.WiseSVN
 			//
 			// File Status
 			//
+			// TortoiseSVN behavior: text status wins over property status for the overlay icon —
+			// an Added/Deleted/Replaced/Unversioned file with property mods is still primarily Added/Deleted/etc.
+			// Conflicted properties are the only exception: they always escalate to Conflicted.
 			VCFileStatus fileStatus = statusData.Status;
-			switch(statusData.PropertiesStatus) {
-				case VCPropertiesStatus.Conflicted:
-					fileStatus = VCFileStatus.Conflicted;
-					break;
-				case VCPropertiesStatus.Modified:
-					fileStatus = (fileStatus != VCFileStatus.Conflicted) ? VCFileStatus.Modified : VCFileStatus.Conflicted;
-					break;
+			if (statusData.PropertiesStatus == VCPropertiesStatus.Conflicted) {
+				fileStatus = VCFileStatus.Conflicted;
+			} else if (statusData.PropertiesStatus == VCPropertiesStatus.Modified
+					&& fileStatus == VCFileStatus.Normal) {
+				fileStatus = VCFileStatus.Modified;
 			}
 
-			// Handle unknown statuses.
+			// File is not in the statuses database. In a healthy working copy most files are
+			// tracked-and-clean — `svn status` only emits non-Normal entries, so absence means
+			// "Normal" by default. Truly unversioned files surface via SVNStatusesDatabase's
+			// m_UnversionedFolders index, which returns VCFileStatus.Unversioned directly.
 			if (m_ShowNormalStatusIcons && !statusData.IsValid) {
 				fileStatus = VCFileStatus.Normal;
 

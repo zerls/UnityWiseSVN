@@ -84,6 +84,15 @@ namespace DevLocker.VersionControl.WiseSVN
 		TortoiseSVN = 1, // Load from TortoiseOverlays installation (Windows only; falls back to Classic)
 	}
 
+	// Maps a branch-name regex pattern to a badge color. Used by SVNStatusBadge.ResolveBranchColor;
+	// rules are evaluated in list order, first match wins. Patterns are matched case-insensitively.
+	[Serializable]
+	public class SVNBranchColorRule
+	{
+		public string Pattern = string.Empty;
+		public Color  Color   = new Color(0.35f, 0.35f, 0.40f, 1f);
+	}
+
 	public enum LockOperationResult
 	{
 		Success = 0,				// Operation succeeded.

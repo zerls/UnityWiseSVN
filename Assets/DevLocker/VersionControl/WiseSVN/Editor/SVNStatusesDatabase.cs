@@ -124,8 +124,26 @@ namespace DevLocker.VersionControl.WiseSVN
 			m_PersonalCachedPrefs = m_PersonalPrefs.Clone();
 			m_ProjectCachedPrefs = m_ProjectPrefs.Clone();
 
+			// Refresh when the editor regains focus — closes the up-to-60s staleness window
+			// caused by external TortoiseSVN/CLI operations. 2-second debounce defeats
+			// alt-tab spam. Gated by RefreshDatabaseOnFocus personal preference.
+			EditorApplication.focusChanged -= OnEditorFocusChanged;
+			EditorApplication.focusChanged += OnEditorFocusChanged;
+
 			base.Initialize(freshlyCreated);
 		}
+
+		private void OnEditorFocusChanged(bool focused)
+		{
+			if (!focused || !IsActive || TemporaryDisabled || IsUpdating) return;
+			if (!SVNPreferencesManager.Instance.PersonalPrefs.RefreshDatabaseOnFocus) return;
+			// Debounce: skip if we refreshed in the last ~2 seconds.
+			if (EditorApplication.timeSinceStartup - m_LastFocusRefresh < 2.0) return;
+			m_LastFocusRefresh = EditorApplication.timeSinceStartup;
+			InvalidateDatabase();
+		}
+
+		[NonSerialized] private double m_LastFocusRefresh;
 
 		protected override void RefreshActive()
 		{
@@ -221,19 +239,27 @@ namespace DevLocker.VersionControl.WiseSVN
 					}
 				}
 
-				DataIsIncomplete = unversionedFolders.Count >= SanityUnversionedFoldersLimit || statuses.Count >= SanityStatusesLimit || ignoredEntries.Count > SanityIgnoresLimit || globalIgnoredEntries.Count > SanityIgnoresLimit;
+				// Non-lossy trimming: keep every status that carries signal (non-Normal, or has lock/remote info,
+				// or is a scene — those are always relevant for the editor). Drop only Normal+clean entries when
+				// over the limit. DataIsIncomplete fires only when the SIGNAL-carrying set itself overflows;
+				// otherwise the user sees a complete picture even with many clean Normal noise entries.
+				var signalful = statuses
+					.Where(s => s.Status != VCFileStatus.Normal
+						|| s.LockStatus != VCLockStatus.NoLock
+						|| s.RemoteStatus != VCRemoteFileStatus.None
+						|| s.Path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+					.ToList();
 
-				// Just in case...
+				DataIsIncomplete = signalful.Count > SanityStatusesLimit
+					|| unversionedFolders.Count >= SanityUnversionedFoldersLimit
+					|| ignoredEntries.Count > SanityIgnoresLimit
+					|| globalIgnoredEntries.Count > SanityIgnoresLimit;
+
+				// Sort unversioned folders shallowest-first so the cap keeps the broadest coverage —
+				// ArePathsNested makes a shallow ancestor entry cover every descendant for free.
 				if (unversionedFolders.Count >= SanityUnversionedFoldersLimit) {
-					unversionedFolders.Clear();
-				}
-
-				if (statuses.Count >= SanityStatusesLimit) {
-					// If server has many remote changes, don't spam me with overlay icons.
-					// Keep showing locked assets or scenes out of date.
-					statuses = statuses
-						.Where(s => s.Status != VCFileStatus.Normal || s.LockStatus != VCLockStatus.NoLock || s.Path.EndsWith(".unity"))
-						.ToList();
+					unversionedFolders.Sort((a, b) => a.Count(c => c == '/' || c == '\\').CompareTo(b.Count(c => c == '/' || c == '\\')));
+					unversionedFolders.RemoveRange(SanityUnversionedFoldersLimit, unversionedFolders.Count - SanityUnversionedFoldersLimit);
 				}
 
 				if (ignoredEntries.Count >= SanityIgnoresLimit) {
@@ -244,16 +270,12 @@ namespace DevLocker.VersionControl.WiseSVN
 					globalIgnoredEntries.RemoveRange(SanityIgnoresLimit, globalIgnoredEntries.Count - SanityIgnoresLimit);
 				}
 
-
 				// HACK: the base class works with the DataType for pending data. Guid won't be used.
-				pendingData = statuses
-					.Where(s => statuses.Count < SanityStatusesLimit    // Include everything when below the limit
-					|| s.Status == VCFileStatus.Added
-					|| s.Status == VCFileStatus.Modified
-					|| s.Status == VCFileStatus.Conflicted
-					|| s.LockStatus != VCLockStatus.NoLock
-					|| s.Path.EndsWith(".unity")
-					)
+				IEnumerable<SVNStatusData> finalStatuses = signalful;
+				if (signalful.Count > SanityStatusesLimit) {
+					finalStatuses = signalful.Take(SanityStatusesLimit);
+				}
+				pendingData = finalStatuses
 					.Select(s => new GuidStatusDatasBind() { MergedStatusData = s })
 					.ToArray();
 
@@ -301,9 +323,10 @@ namespace DevLocker.VersionControl.WiseSVN
 			var statuses = new List<SVNStatusData>();
 			StatusOperationResult result = WiseSVNIntegration.GetStatuses(repositoryPath, true, offline, statuses, true, WiseSVNIntegration.ONLINE_COMMAND_TIMEOUT * 2, shellMonitor);
 
+			// Keep VCFileStatus.Missing — svn-tracked files that the user deleted locally still need a `!` icon
+			// in the Project window to match TortoiseSVN's Explorer overlay.
 			statuses.RemoveAll(
-				s => SVNPreferencesManager.ShouldExclude(excludes, s.Path) || // TODO: This will skip overlay icons for excludes by filename.
-				s.Status == VCFileStatus.Missing);
+				s => SVNPreferencesManager.ShouldExclude(excludes, s.Path)); // TODO: This will skip overlay icons for excludes by filename.
 
 			if (result != StatusOperationResult.Success) {
 				LastError = result;

@@ -306,19 +306,46 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			EditorGUILayout.Space(4);
 			EditorGUILayout.LabelField(TrContent("prefs.statusbar_header", "prefs.statusbar_header.tooltip"), EditorStyles.boldLabel);
-			m_PersonalPrefs.ShowSVNStatusOverlay  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_overlay",  "prefs.statusbar_overlay.tooltip"),  m_PersonalPrefs.ShowSVNStatusOverlay);
 			m_PersonalPrefs.ShowSVNStatusToolbar  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_toolbar",  "prefs.statusbar_toolbar.tooltip"),  m_PersonalPrefs.ShowSVNStatusToolbar);
 			m_PersonalPrefs.ShowSVNStatusTitleBar = EditorGUILayout.Toggle(TrContent("prefs.statusbar_titlebar", "prefs.statusbar_titlebar.tooltip"), m_PersonalPrefs.ShowSVNStatusTitleBar);
+			m_PersonalPrefs.ShowSVNStatusSceneView = EditorGUILayout.Toggle(TrContent("prefs.statusbar_sceneview", "prefs.statusbar_sceneview.tooltip"), m_PersonalPrefs.ShowSVNStatusSceneView);
+			using (new EditorGUI.DisabledScope(!m_PersonalPrefs.ShowSVNStatusSceneView))
+			using (new EditorGUI.IndentLevelScope()) {
+				m_PersonalPrefs.SceneViewBranchFontSize = EditorGUILayout.IntSlider(TrContent("prefs.statusbar_sceneview_fontsize", "prefs.statusbar_sceneview_fontsize.tooltip"), m_PersonalPrefs.SceneViewBranchFontSize, 10, 40);
+				m_PersonalPrefs.SceneViewBranchAlpha = EditorGUILayout.Slider(TrContent("prefs.statusbar_sceneview_alpha", "prefs.statusbar_sceneview_alpha.tooltip"), m_PersonalPrefs.SceneViewBranchAlpha, 0.2f, 1f);
+			}
+
 			m_PersonalPrefs.AdaptiveSVNStatusColor = EditorGUILayout.Toggle(TrContent("prefs.statusbar_adaptive_color", "prefs.statusbar_adaptive_color.tooltip"), m_PersonalPrefs.AdaptiveSVNStatusColor);
-			EditorGUI.BeginDisabledGroup(m_PersonalPrefs.AdaptiveSVNStatusColor);
-			m_PersonalPrefs.SVNStatusBadgeColor = EditorGUILayout.ColorField(TrContent("prefs.statusbar_badge_color", "prefs.statusbar_badge_color.tooltip"), m_PersonalPrefs.SVNStatusBadgeColor);
-			EditorGUI.EndDisabledGroup();
+			using (new EditorGUI.DisabledScope(m_PersonalPrefs.AdaptiveSVNStatusColor)) {
+				m_PersonalPrefs.SVNStatusBadgeColor = EditorGUILayout.ColorField(TrContent("prefs.statusbar_badge_color", "prefs.statusbar_badge_color.tooltip"), m_PersonalPrefs.SVNStatusBadgeColor);
+			}
+
+			if (m_PersonalPrefs.AdaptiveSVNStatusColor) {
+				EditorGUILayout.LabelField(TrContent("prefs.statusbar_branch_rules", "prefs.statusbar_branch_rules.tooltip"), EditorStyles.boldLabel);
+				DrawBranchColorRulesList();
+				m_PersonalPrefs.DefaultBranchColor = EditorGUILayout.ColorField(TrContent("prefs.statusbar_branch_default_color", "prefs.statusbar_branch_default_color.tooltip"), m_PersonalPrefs.DefaultBranchColor);
+			}
 			EditorGUILayout.Space(4);
 
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
 			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
 			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
 			m_PersonalPrefs.AutoRefreshDatabaseInterval = EditorGUILayout.IntField(TrContent("prefs.refresh_interval", "prefs.refresh_interval.tooltip"), m_PersonalPrefs.AutoRefreshDatabaseInterval);
+			m_PersonalPrefs.RefreshDatabaseOnFocus = EditorGUILayout.Toggle(TrContent("prefs.refresh_on_focus", "prefs.refresh_on_focus.tooltip"), m_PersonalPrefs.RefreshDatabaseOnFocus);
+
+#if UNITY_EDITOR_WIN
+			// Windows-only: TSVNCache provider. The toggle takes effect on next editor restart
+			// (we resolve the provider once at startup to avoid mid-session race conditions).
+			m_PersonalPrefs.PreferTSVNCache = EditorGUILayout.Toggle(TrContent("prefs.prefer_tsvncache", "prefs.prefer_tsvncache.tooltip"), m_PersonalPrefs.PreferTSVNCache);
+			using (new EditorGUI.IndentLevelScope()) {
+				string activeSource = SVNPreferencesManager.Instance.StatusProvider.DisplayName;
+				string probeMsg     = SVNPreferencesManager.Instance.StatusProviderProbeMessage ?? string.Empty;
+				EditorGUILayout.LabelField(string.Format(Tr("prefs.status_source"), activeSource), EditorStyles.miniLabel);
+				if (!string.IsNullOrEmpty(probeMsg)) {
+					EditorGUILayout.LabelField(probeMsg, EditorStyles.miniLabel);
+				}
+			}
+#endif
 
 			m_PersonalPrefs.DownloadRepositoryChanges =
 				(SVNPreferencesManager.BoolPreference)EditorGUILayout.EnumPopup(
@@ -367,6 +394,34 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			EditorGUILayout.PropertyField(sp.FindPropertyRelative("Exclude"), TrContent("prefs.exclude_paths", "prefs.exclude_paths.tooltip"), true);
 
 			EditorGUI.EndDisabledGroup();
+		}
+
+		private void DrawBranchColorRulesList()
+		{
+			var rules = m_PersonalPrefs.BranchColorRules;
+			if (rules == null) {
+				m_PersonalPrefs.BranchColorRules = rules = new List<SVNBranchColorRule>();
+			}
+
+			int removeIdx = -1;
+			for (int i = 0; i < rules.Count; i++) {
+				var rule = rules[i];
+				if (rule == null) { rules[i] = rule = new SVNBranchColorRule(); }
+
+				using (new EditorGUILayout.HorizontalScope()) {
+					rule.Pattern = EditorGUILayout.TextField(rule.Pattern, GUILayout.MinWidth(120));
+					rule.Color   = EditorGUILayout.ColorField(GUIContent.none, rule.Color, false, true, false, GUILayout.Width(60));
+					if (GUILayout.Button("×", EditorStyles.miniButton, GUILayout.Width(22))) removeIdx = i;
+				}
+			}
+			if (removeIdx >= 0) rules.RemoveAt(removeIdx);
+
+			using (new EditorGUILayout.HorizontalScope()) {
+				GUILayout.FlexibleSpace();
+				if (GUILayout.Button(Tr("prefs.statusbar_branch_rule_add"), EditorStyles.miniButton, GUILayout.Width(110))) {
+					rules.Add(new SVNBranchColorRule());
+				}
+			}
 		}
 
 		private void DrawProjectPreferences()
