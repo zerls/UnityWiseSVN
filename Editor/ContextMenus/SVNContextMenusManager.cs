@@ -1,8 +1,10 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
+using DevLocker.VersionControl.WiseSVN.Branches;
 using DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation;
 using DevLocker.VersionControl.WiseSVN.Ignore;
 using DevLocker.VersionControl.WiseSVN.Localization;
+using DevLocker.VersionControl.WiseSVN.Preferences;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -222,11 +224,93 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			CheckChangesSelected();
 		}
 
-		[MenuItem("Window/Version Control/SVN/\U0001F50D  Check Changes (All)", false, WindowMenuPriority + 10)]
+		// \u2500\u2500 Assets/SVN/More Tools submenu \u2014 less-common operations, debug, and prefs \u2500\u2500
+		private const string MoreTools = "Assets/SVN/More Tools/";
+
+		[MenuItem(MoreTools + "\U0001F50D  Check Changes (All)", false, MenuItemPriorityStart + 200)]
 		public static void CheckChangesAll()
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(
 			m_Integration?.CheckChanges(GetRootAssetPath().Concat(SVNStatusesDatabase.Instance.NestedRepositories), false);
+		}
+
+		[MenuItem(MoreTools + "\u21a9  Revert All", false, MenuItemPriorityStart + 201)]
+		public static void RevertAllMenu()
+		{
+			RevertAll();
+		}
+
+		[MenuItem(MoreTools + "\u2631  Show Log (All)", false, MenuItemPriorityStart + 202)]
+		public static void ShowLogAllMenu()
+		{
+			ShowLogAll();
+		}
+
+		[MenuItem(MoreTools + "\U0001F4C1  Repo Browser", false, MenuItemPriorityStart + 203)]
+		public static void RepoBrowserSelectedMenu()
+		{
+			RepoBrowserSelected();
+		}
+
+		[MenuItem(MoreTools + "\U0001F440  Blame", false, MenuItemPriorityStart + 204)]
+		public static void BlameSelectedMenu()
+		{
+			BlameSelected();
+		}
+
+		[MenuItem(MoreTools + "\u26d4  Ignore Toggle", false, MenuItemPriorityStart + 205)]
+		public static void IgnoreToggleSelectedMenu()
+		{
+			IgnoreToggleSelected();
+		}
+
+		[MenuItem(MoreTools + "\U0001F4CB  Ignore Manager", false, MenuItemPriorityStart + 206)]
+		public static void ShowIgnoreManagerMenu()
+		{
+			ShowIgnoreManager();
+		}
+
+		[MenuItem(MoreTools + "\U0001F9F9  Cleanup", false, MenuItemPriorityStart + 207)]
+		public static void CleanupMenu()
+		{
+			Cleanup();
+		}
+
+		[MenuItem(MoreTools + "\U0001F4CD  Branch Selector", false, MenuItemPriorityStart + 208)]
+		public static void BranchSelectorMenu()
+		{
+			SVNBranchSelectorWindow.OpenBranchesSelector();
+		}
+
+		[MenuItem(MoreTools + "\U0001F504  Refresh Icons && Locks", false, MenuItemPriorityStart + 209)]
+		public static void RefreshIconsMenu()
+		{
+			SVNOverlayIcons.InvalidateDatabaseMenu();
+		}
+
+		[MenuItem(MoreTools + "\U0001F41B  Debug/Status Provider Info", false, MenuItemPriorityStart + 210)]
+		public static void DebugStatusProviderInfoMenu()
+		{
+			Providers.StatusProviderInfoWindow.Open();
+		}
+
+		[MenuItem(MoreTools + "\u2699  SVN Preferences", false, MenuItemPriorityStart + 211)]
+		public static void PreferencesMenu()
+		{
+			SVNPreferencesWindow.ShowProjectPreferences();
+		}
+
+		// \u2500\u2500 Window menu: only the essential commands \u2500\u2500
+		[MenuItem("Window/Version Control/SVN/\u2699  SVN Preferences", false, WindowMenuPriority + 5)]
+		public static void WindowPreferences()
+		{
+			SVNPreferencesWindow.ShowProjectPreferences();
+		}
+
+		[MenuItem("Window/Version Control/SVN/\U0001F504  Refresh Icons && Locks", false, WindowMenuPriority + 10)]
+		public static void WindowRefreshIcons()
+		{
+			SVNOverlayIcons.InvalidateDatabaseMenu();
 		}
 
 		[MenuItem("Assets/SVN/\U0001F50D  Check Changes %&c", false, MenuItemPriorityStart + 6)]
@@ -378,7 +462,8 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Window/Version Control/SVN/\u21A9  Revert All", false, WindowMenuPriority + 20)]
+		// (Window menu attribute removed \u2014 is now under More Tools)
+
 		public static void RevertAll()
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(
@@ -522,7 +607,8 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Window/Version Control/SVN/\u2631  Show Log (All)", false, WindowMenuPriority + 5)]
+		// (Window menu attribute removed \u2014 is now under More Tools)
+
 		public static void ShowLogAll()
 		{
 			m_Integration?.ShowLog(GetRootAssetPath().First());
@@ -539,7 +625,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.ShowLog(assetPath, wait);
 		}
 
-		[MenuItem("Window/Version Control/SVN/\U0001F4C1  Repo Browser", false, WindowMenuPriority + 30)]
+		// (Window menu attribute removed — is now under More Tools)
 		public static void RepoBrowserSelected()
 		{
 			m_Integration?.RepoBrowser(GetSelectedAssetPaths().Select(WiseSVNIntegration.AssetPathToURL).FirstOrDefault());
@@ -569,7 +655,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		}
 
 
-		[MenuItem("Window/Version Control/SVN/\U0001F440  Blame", false, WindowMenuPriority + 35)]
+		// (Window menu attribute removed — is now under More Tools)
 		public static void BlameSelected()
 		{
 			m_Integration?.Blame(GetSelectedAssetPaths().FirstOrDefault());
@@ -581,7 +667,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		}
 
 		// Enabled in 1.6.0: per-asset svn:ignore toggle. Use Ignore Manager (Assets/SVN/Ignore Manager) for batch editing.
-		[MenuItem("Window/Version Control/SVN/\u26D4  Ignore Toggle", false, WindowMenuPriority + 40)]
+		// (Window menu attribute removed \u2014 is now under More Tools)
 		public static void IgnoreToggleSelected()
 		{
 			IgnoreToggle(GetSelectedAssetPaths().FirstOrDefault());
@@ -664,13 +750,13 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Window/Version Control/SVN/\U0001F4CB  Ignore Manager", false, WindowMenuPriority + 41)]
+		// (Window menu attribute removed — is now under More Tools)
 		public static void ShowIgnoreManager()
 		{
 			SVNIgnoreManagerWindow.Open();
 		}
 
-		[MenuItem("Window/Version Control/SVN/\U0001F9F9  Cleanup", false, WindowMenuPriority + 50)]
+		// (Window menu attribute removed — is now under More Tools)
 		public static void Cleanup()
 		{
 			m_Integration?.Cleanup(true);

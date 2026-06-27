@@ -14,7 +14,7 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 	/// </summary>
 	internal class StatusProviderInfoWindow : EditorWindow
 	{
-		[MenuItem("Window/Version Control/SVN/🐛 Debug/Status Provider Info", false, ContextMenus.SVNContextMenusManager.WindowMenuPriority + 100)]
+		// (Window menu attribute removed — accessible via Assets/SVN/More Tools/🐛 Debug/Status Provider Info)
 		public static void Open()
 		{
 			GetWindow<StatusProviderInfoWindow>("WiseSVN Status Source").Show();
@@ -173,20 +173,62 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			}
 		}
 
+		// Write diagnostic text to a file in the project root and log its path to the console.
+		// Returns the absolute path of the written file (or null on failure).
+		private static string WriteDiagnosticFile(string baseName, string content)
+		{
+			try {
+				string projectRoot = System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath);
+				string dir = System.IO.Path.Combine(projectRoot, "WiseSVN-Diagnostics");
+				System.IO.Directory.CreateDirectory(dir);
+				// Stable filename so users always know the latest; previous one gets overwritten.
+				string filePath = System.IO.Path.Combine(dir, baseName + ".txt");
+				System.IO.File.WriteAllText(filePath, content, new System.Text.UTF8Encoding(false));
+				Debug.Log($"[WiseSVN-Diag] Diagnostic written to:\n  {filePath}\n(open in any text editor and paste/upload its contents)");
+				return filePath;
+			} catch (System.Exception ex) {
+				Debug.LogError($"[WiseSVN-Diag] Failed to write diagnostic file: {ex.GetType().Name}: {ex.Message}");
+				return null;
+			}
+		}
+
 		private static void DumpRawBytes(string assetPath)
 		{
 			const int requestSize = 4 + 260 * 2;   // DWORD flags + WCHAR[260] path
 
-			// Step 1: log all TSVN-prefixed pipes so we know what's available.
-			LogAvailableTSVNPipes();
+			var outSb = new StringBuilder();
+			outSb.AppendLine("================ WiseSVN TSVNCache Raw Response Dump ================");
+			outSb.AppendLine($"Timestamp: {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+			outSb.AppendLine($"Asset path: {assetPath}");
+			outSb.AppendLine();
+
+			// Step 1: enumerate TSVN pipes.
+			outSb.AppendLine("---- Available TSVN named pipes ----");
+			try {
+				string[] pipes = System.IO.Directory.GetFiles(@"\\.\pipe\");
+				bool any = false;
+				foreach (var p in pipes) {
+					string name = System.IO.Path.GetFileName(p);
+					if (name.StartsWith("TSVN", System.StringComparison.OrdinalIgnoreCase)) {
+						outSb.AppendLine($"  \\\\.\\pipe\\{name}");
+						any = true;
+					}
+				}
+				if (!any) outSb.AppendLine("  (none found — is TortoiseSVN running?)");
+			} catch (System.Exception ex) {
+				outSb.AppendLine($"  ENUMERATION FAILED: {ex.GetType().Name}: {ex.Message}");
+			}
+			outSb.AppendLine();
 
 			string pipeName = FindTSVNCachePipeName();
-			Debug.Log($"[WiseSVN-RawDump] Using pipe name: \"{pipeName}\"");
+			outSb.AppendLine($"Chosen pipe: \"{pipeName}\"");
 
 			// Build absolute native path.
 			string nativePath = System.IO.Path.IsPathRooted(assetPath)
 				? assetPath.Replace('/', '\\')
 				: System.IO.Path.Combine(WiseSVNIntegration.ProjectRootNative, assetPath).Replace('/', '\\');
+			outSb.AppendLine($"Native path sent: \"{nativePath}\"");
+			outSb.AppendLine();
 
 			try {
 				using (var pipe = new System.IO.Pipes.NamedPipeClientStream(
@@ -204,59 +246,74 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 					pipe.Write(req, 0, req.Length);
 					pipe.Flush();
 
-					// Read with a deadline — NamedPipeClientStream in async mode supports ReadTimeout.
-					pipe.ReadTimeout = 800;
+					// NamedPipeClientStream does NOT support .ReadTimeout — use BeginRead with WaitHandle deadline.
 					var buf = new System.Collections.Generic.List<byte>();
 					var tmp = new byte[1024];
+					const int deadlineMs = 800;
+					var deadline = System.Environment.TickCount + deadlineMs;
 					try {
-						int n;
-						while ((n = pipe.Read(tmp, 0, tmp.Length)) > 0)
+						while (true) {
+							int remaining = deadline - System.Environment.TickCount;
+							if (remaining <= 0) break;
+							var ar = pipe.BeginRead(tmp, 0, tmp.Length, null, null);
+							if (!ar.AsyncWaitHandle.WaitOne(remaining)) {
+								// Timed out waiting for more data — assume server is done.
+								break;
+							}
+							int n = pipe.EndRead(ar);
+							if (n <= 0) break;
 							for (int i = 0; i < n; i++) buf.Add(tmp[i]);
-					} catch (System.TimeoutException) { /* server sent all it has — done */ }
-					catch (System.IO.IOException) { /* pipe closed by server — done */ }
+							// If we just got a partial buffer and pipe says no more data, exit promptly.
+							if (n < tmp.Length && !pipe.IsConnected) break;
+						}
+					} catch (System.IO.IOException) { /* pipe closed by server — done */ }
 
 					byte[] raw = buf.ToArray();
 					int len = raw.Length;
 
-					var sb = new StringBuilder();
-					sb.AppendLine($"[WiseSVN-RawDump] pipe=\"{pipeName}\"  path=\"{nativePath}\"  total_bytes={len}");
+					outSb.AppendLine($"---- Response ----");
+					outSb.AppendLine($"Total bytes received: {len}");
 					if (len == 0) {
-						sb.AppendLine("  WARNING: received 0 bytes — check pipe name or request format");
-						Debug.LogWarning(sb.ToString());
+						outSb.AppendLine("WARNING: received 0 bytes — check pipe name or request format");
+						WriteDiagnosticFile("tsvncache-rawdump", outSb.ToString());
 						return;
 					}
 
 					// Hex rows, 16 bytes each.
-					sb.AppendLine("  Offset  | 00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  | ASCII");
-					sb.AppendLine("  --------+-------------------------------------------------+------------------");
+					outSb.AppendLine();
+					outSb.AppendLine("  Offset  | 00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  | ASCII");
+					outSb.AppendLine("  --------+-------------------------------------------------+------------------");
 					for (int row = 0; row < len; row += 16) {
 						int rowEnd = System.Math.Min(row + 16, len);
-						sb.Append($"  {row:X6}  | ");
+						outSb.Append($"  {row:X6}  | ");
 						for (int i = row; i < row + 16; i++) {
-							if (i < rowEnd) sb.Append($"{raw[i]:X2} ");
-							else            sb.Append("   ");
-							if (i == row + 7) sb.Append(" ");
+							if (i < rowEnd) outSb.Append($"{raw[i]:X2} ");
+							else            outSb.Append("   ");
+							if (i == row + 7) outSb.Append(" ");
 						}
-						sb.Append(" | ");
+						outSb.Append(" | ");
 						for (int i = row; i < rowEnd; i++) {
 							char c = (char)raw[i];
-							sb.Append(c >= 0x20 && c < 0x7F ? c : '.');
+							outSb.Append(c >= 0x20 && c < 0x7F ? c : '.');
 						}
-						sb.AppendLine();
+						outSb.AppendLine();
 					}
 
 					// Int32 words — easy to overlay against a struct definition.
-					sb.AppendLine();
-					sb.AppendLine("  Int32 words (little-endian):");
+					outSb.AppendLine();
+					outSb.AppendLine("  Int32 words (little-endian):");
 					for (int i = 0; i + 3 < len; i += 4) {
 						int word = System.BitConverter.ToInt32(raw, i);
-						sb.AppendLine($"    [byte {i,3}] word[{i/4,2}] = {word,12}  (0x{word:X8})");
+						outSb.AppendLine($"    [byte {i,3}] word[{i/4,2}] = {word,12}  (0x{word:X8})");
 					}
 
-					Debug.Log(sb.ToString());
+					WriteDiagnosticFile("tsvncache-rawdump", outSb.ToString());
 				}
 			} catch (System.Exception ex) {
-				Debug.LogError($"[WiseSVN-RawDump] Failed on pipe \"{pipeName}\": {ex.GetType().Name}: {ex.Message}");
+				outSb.AppendLine();
+				outSb.AppendLine($"ERROR on pipe \"{pipeName}\": {ex.GetType().Name}: {ex.Message}");
+				outSb.AppendLine(ex.StackTrace);
+				WriteDiagnosticFile("tsvncache-rawdump", outSb.ToString());
 			}
 		}
 
@@ -362,11 +419,14 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 						pipe.Flush();
 						sb.Append("wrote request. ");
 
-						pipe.ReadTimeout = 500;
+						// NamedPipeClientStream does NOT support .ReadTimeout — use BeginRead/EndRead with a deadline.
 						var buf = new byte[2048];
 						int n = 0;
-						try { n = pipe.Read(buf, 0, buf.Length); }
-						catch (System.TimeoutException) { sb.AppendLine("read timeout (0 bytes)"); continue; }
+						try {
+							var ar = pipe.BeginRead(buf, 0, buf.Length, null, null);
+							if (!ar.AsyncWaitHandle.WaitOne(500)) { sb.AppendLine("read timeout (0 bytes)"); continue; }
+							n = pipe.EndRead(ar);
+						} catch (System.Exception ex) { sb.AppendLine($"read failed: {ex.GetType().Name}: {ex.Message}"); continue; }
 
 						if (n <= 0) {
 							sb.AppendLine("read 0 bytes (server closed)");

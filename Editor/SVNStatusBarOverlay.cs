@@ -198,7 +198,10 @@ namespace DevLocker.VersionControl.WiseSVN
 		internal static void DrawBadgeGUI()
 		{
 			var prefs = SVNPreferencesManager.Instance?.PersonalPrefs;
-			if (prefs == null || !prefs.EnableCoreIntegration || !prefs.PopulateStatusesDatabase) {
+			if (prefs == null || !SVNPreferencesManager.Instance.IsIntegrationEnabled) {
+				return;
+			}
+			if (!prefs.EnableCoreIntegration || !prefs.PopulateStatusesDatabase) {
 				GUILayout.Label(Tr("overlay.svnstatus.disabled"), BadgeStyle);
 				return;
 			}
@@ -524,7 +527,8 @@ namespace DevLocker.VersionControl.WiseSVN
 		static void ApplyVisibility()
 		{
 			if (s_BadgeRoot == null) return;
-			bool show = SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusToolbar ?? true;
+			bool enabled = SVNPreferencesManager.Instance?.IsIntegrationEnabled ?? false;
+			bool show    = enabled && (SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusToolbar ?? true);
 			s_BadgeRoot.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
 		}
 	}
@@ -563,7 +567,8 @@ namespace DevLocker.VersionControl.WiseSVN
 
 		private static void OnPrefsChanged()
 		{
-			bool enabled = SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusTitleBar ?? false;
+			bool enabled = SVNPreferencesManager.Instance?.IsIntegrationEnabled ?? false
+				&& (SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusTitleBar ?? false);
 			if (!enabled) {
 				WriteTitle(string.Empty);
 				return;
@@ -579,6 +584,7 @@ namespace DevLocker.VersionControl.WiseSVN
 		{
 			if (!s_Pending) return;
 			s_Pending = false;
+			if (!(SVNPreferencesManager.Instance?.IsIntegrationEnabled ?? false)) return;
 			if (!(SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusTitleBar ?? false)) return;
 			WriteTitle(SVNStatusBadge.BranchName);
 		}
@@ -633,7 +639,9 @@ namespace DevLocker.VersionControl.WiseSVN
 		private static void OnPrefsChanged()
 		{
 			SceneView.duringSceneGui -= OnSceneGUI;
-			if (SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusSceneView ?? false)
+			bool enabled = SVNPreferencesManager.Instance?.IsIntegrationEnabled ?? false
+				&& (SVNPreferencesManager.Instance?.PersonalPrefs.ShowSVNStatusSceneView ?? false);
+			if (enabled)
 				SceneView.duringSceneGui += OnSceneGUI;
 
 			foreach (var sv in SceneView.sceneViews)

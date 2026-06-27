@@ -45,8 +45,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			{ "The Pythagorean Siphon Inside Your Washing Machine", "https://www.youtube.com/watch?v=Cg8KQfaT9xY" },
 		};
 
-		public const string PROJECT_PREFERENCES_MENU = "Window/Version Control/SVN/⚙  SVN Preferences";
-		[MenuItem(PROJECT_PREFERENCES_MENU, false, SVNContextMenusManager.WindowMenuPriority)]
+		public const string PROJECT_PREFERENCES_MENU = "Window/Version Control/SVN/⚙ SVN Preferences";
+
+		// (Window menu attribute removed — now via Assets/SVN/More Tools/)
 		public static void ShowProjectPreferences()
 		{
 			ShowProjectPreferences(PreferencesTab.Personal);
