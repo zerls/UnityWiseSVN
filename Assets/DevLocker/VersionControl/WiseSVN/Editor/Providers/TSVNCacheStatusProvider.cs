@@ -44,6 +44,14 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		private const double k_CacheTTL = 5.0;          // seconds — TSVNCache itself is reactive, so short TTL is fine
 		private const int k_PipeTimeoutMs = 200;        // hard ceiling on a single sync query
 		private const int k_ProbeTimeoutMs = 300;       // short — probe runs on worker thread but still don't waste time
+
+		// On cache miss, DON'T block the main thread with a pipe query — the Project window
+		// calls GetStatus() for every visible asset per frame, so a single cold miss would
+		// cascade into N×800ms hangs. Instead return None immediately and schedule a one-shot
+		// background refresh that populates the cache, then repaints the Project window.
+		// 200ms cooldown prevents runaway bursts during rapid scrolling.
+		private bool m_CacheMissPending;
+		private double m_LastCacheMissTime;
 		// Pipe names — discovered at runtime because newer TortoiseSVN versions append the
 		// Windows session ID: \\.\pipe\TSVNCache_1  / \\.\pipe\TSVNCacheCommand_1.
 		// s_StatusPipeName / s_CommandPipeName are resolved once on first use.
@@ -121,11 +129,11 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 						failureReason = "Failed to read response: " + readErr;
 						return false;
 					}
-					// Sanity check: text_status must be in [1..14] (svn_wc_status_kind range).
-					if (resp.text_status < 1 || resp.text_status > 14) {
-						failureReason = $"Invalid text_status={resp.text_status} (expected 1–14). " +
-							$"First 8 int-words of response: " +
-							DumpFirstWords(resp);
+					// Sanity check: textStatus must be in [1..14] (svn_wc_status_kind range);
+					// kind must be 1 (file) or 2 (dir).
+					if (resp.textStatus < 1 || resp.textStatus > 14 || (resp.kind != svn_node_file && resp.kind != svn_node_dir)) {
+						failureReason = $"Invalid response (kind={resp.kind}, textStatus={resp.textStatus}). " +
+							$"First 16 bytes: " + DumpFirstWords(resp);
 						return false;
 					}
 					return true;
@@ -179,11 +187,31 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 					return entry.status;
 			}
 
-			var status = QueryPipe(nativePath);
-			lock (m_CacheLock) {
-				m_Cache[nativePath] = (status, now);
-			}
-			return status;
+			// Cache miss — don't block Unity's GUI thread with a sync pipe query.
+			// This is the Project window's per-asset path; doing sync IPC here would
+			// freeze the editor. The caller can request a background fill via EnqueueCacheMissFill().
+			ScheduleCacheMissFill();
+			return new SVNStatusData { Status = VCFileStatus.None };
+		}
+
+		private void ScheduleCacheMissFill()
+		{
+			double now = EditorApplication.timeSinceStartup;
+			if (m_CacheMissPending) return;
+			if (now - m_LastCacheMissTime < 0.2) return;
+			m_LastCacheMissTime = now;
+			m_CacheMissPending = true;
+			EditorApplication.delayCall += ExecuteCacheMissFill;
+		}
+
+		private void ExecuteCacheMissFill()
+		{
+			m_CacheMissPending = false;
+			if (!m_Ready) return;
+			try {
+				// Fire StatusesChanged so the Project window repaints.
+				StatusesChanged?.Invoke();
+			} catch { /* best-effort */ }
 		}
 
 		public IEnumerable<SVNStatusData> EnumerateInteresting()
@@ -225,36 +253,62 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		}
 
 		// ── Wire format ──────────────────────────────────────────────────────
-		// Request struct (matches CacheInterface.h):
-		//   DWORD  flags;                         // 4 bytes
-		//   WCHAR  path[260];                     // 520 bytes (MAX_PATH wide chars, null-terminated)
-		// Total: 524 bytes
+		// Source of truth: TortoiseSVN trunk/src/TSVNCache/CacheInterface.h.
+		//
+		// Request struct TSVNCacheRequest { DWORD flags; WCHAR path[MAX_PATH]; }
+		//   → 4 + 260*2 = 524 bytes
 		private const int k_RequestSize = 4 + 260 * 2;
 
-		// Response struct (best-effort interpretation of TortoiseSVN's TStatusCacheEntry serialization).
-		// We only consume the leading well-defined fields and ignore the tail.
-		[StructLayout(LayoutKind.Sequential)]
+		// TSVNCache request flag bits (CacheInterface.h):
+		private const uint TSVNCACHE_FLAGS_FOLDERISKNOWN   = 0x01;
+		private const uint TSVNCACHE_FLAGS_ISFOLDER        = 0x02;
+		private const uint TSVNCACHE_FLAGS_RECURSIVE_STATUS = 0x04;
+		private const uint TSVNCACHE_FLAGS_NONOTIFICATIONS = 0x08;
+
+		// Response struct TSVNCacheResponse {
+		//   INT8  m_kind;         // svn_node_kind  (1=file, 2=dir)
+		//   bool  m_needsLock;
+		//   bool  m_treeConflict;
+		//   bool  m_hasLockOwner;
+		//   INT8  m_textStatus;   // svn_wc_status_kind 1..14
+		//   INT8  m_propStatus;
+		//   INT8  m_status;       // overall (combined) status
+		//   INT64 m_cmtRev;       // last-committed revision  (8-byte aligned → 1 byte pad before)
+		// }
+		// MSVC default packing aligns INT64 to its size → total sizeof = 16 bytes (8 byte head + 8 byte cmtRev).
+		// Confirmed against real wire: 02 00 00 00 03 01 03 00 16 00 00 00 00 00 00 00 ← Assets/Scenes (dir, normal, rev 22).
+		[StructLayout(LayoutKind.Sequential, Pack = 8)]
 		private struct TSVNCacheResponseHeader
 		{
-			public int text_status;     // svn_wc_status_kind
-			public int prop_status;
-			public int repo_text_status;
-			public int repo_prop_status;
-			public int locked;          // BOOL (4 bytes)
-			public int copied;
-			public int switched;
-			public int kind;            // svn_node_kind_t: 1=file, 2=dir
+			public sbyte  kind;             // 0  INT8
+			[MarshalAs(UnmanagedType.U1)]
+			public bool   needsLock;        // 1  bool (C++ bool = 1 byte on MSVC)
+			[MarshalAs(UnmanagedType.U1)]
+			public bool   treeConflict;     // 2  bool
+			[MarshalAs(UnmanagedType.U1)]
+			public bool   hasLockOwner;     // 3  bool
+			public sbyte  textStatus;       // 4  INT8
+			public sbyte  propStatus;       // 5  INT8
+			public sbyte  status;           // 6  INT8
+			public byte   _pad7;            // 7  padding (manually declared so layout is explicit)
+			public long   cmtRev;           // 8  INT64
 		}
 
+		// TSVNCache command IDs (CacheInterface.h).
 		private const int TSVNCACHECOMMAND_CRAWL       = 1;
 		private const int TSVNCACHECOMMAND_REFRESHALL  = 2;
+
+		// svn_node_kind values:
+		private const sbyte svn_node_file = 1;
+		private const sbyte svn_node_dir  = 2;
 
 		private static bool WriteRequest(Stream pipe, string nativePath, bool recursive)
 		{
 			try {
 				var buffer = new byte[k_RequestSize];
-				// flags: 1 = recursive query, 0 = single path. We always use 0 — overlay queries are per-file.
-				BitConverter.GetBytes(recursive ? 1 : 0).CopyTo(buffer, 0);
+				// flags: tell the cache whether we want a recursive (folder-rollup) status.
+				uint flags = recursive ? TSVNCACHE_FLAGS_RECURSIVE_STATUS : 0u;
+				BitConverter.GetBytes(flags).CopyTo(buffer, 0);
 				// path: WCHAR[260], null-terminated. TSVNCache wants absolute paths with backslashes.
 				string padded = nativePath ?? string.Empty;
 				if (padded.Length > 259) padded = padded.Substring(0, 259);  // leave room for null terminator
@@ -272,15 +326,24 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			header = default;
 			error = null;
 			try {
-				// Set a read deadline so we don't block indefinitely if the server sends nothing.
-				// Only valid when the pipe was opened with PipeOptions.Asynchronous.
-				try { pipe.ReadTimeout = 800; } catch { /* not all streams support this */ }
-
+				// NamedPipeClientStream does NOT support .ReadTimeout. Use BeginRead/EndRead with a deadline.
 				int size = Marshal.SizeOf<TSVNCacheResponseHeader>();
 				var buffer = new byte[size];
 				int read = 0;
+				const int deadlineMs = 800;
+				int deadlineTick = System.Environment.TickCount + deadlineMs;
 				while (read < size) {
-					int n = pipe.Read(buffer, read, size - read);
+					int remaining = deadlineTick - System.Environment.TickCount;
+					if (remaining <= 0) {
+						error = $"Read timeout ({read}/{size})";
+						return false;
+					}
+					var ar = pipe.BeginRead(buffer, read, size - read, null, null);
+					if (!ar.AsyncWaitHandle.WaitOne(remaining)) {
+						error = $"Read timeout ({read}/{size})";
+						return false;
+					}
+					int n = pipe.EndRead(ar);
 					if (n <= 0) {
 						error = $"Short read ({read}/{size})";
 						return false;
@@ -294,11 +357,16 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 					handle.Free();
 				}
 				// Drain any trailing bytes the server might send for variable-length fields we don't parse.
-				// Without this the next request on a fresh pipe handles cleanly.
+				// Bounded by a short deadline so we don't block.
 				try {
-					while (pipe.CanRead) {
-						var drain = new byte[256];
-						if (pipe.Read(drain, 0, drain.Length) <= 0) break;
+					int drainDeadline = System.Environment.TickCount + 100;
+					var drain = new byte[256];
+					while (System.Environment.TickCount < drainDeadline) {
+						int remaining = drainDeadline - System.Environment.TickCount;
+						if (remaining <= 0) break;
+						var ar = pipe.BeginRead(drain, 0, drain.Length, null, null);
+						if (!ar.AsyncWaitHandle.WaitOne(remaining)) break;
+						if (pipe.EndRead(ar) <= 0) break;
 					}
 				} catch { /* end-of-stream is fine */ }
 				return true;
@@ -398,22 +466,29 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 
 		private static SVNStatusData ToSVNStatusData(TSVNCacheResponseHeader resp, string nativePath)
 		{
-			VCFileStatus fileStatus = (resp.text_status >= 0 && resp.text_status < k_StatusKindMap.Length)
-				? k_StatusKindMap[resp.text_status] : VCFileStatus.None;
-			VCPropertiesStatus propStatus = (resp.prop_status >= 0 && resp.prop_status < k_PropStatusMap.Length)
-				? k_PropStatusMap[resp.prop_status] : VCPropertiesStatus.None;
+			// Use the combined m_status field — it folds text + prop into a single overall status the
+			// shell uses for the overlay icon. Fall back to textStatus if m_status is None.
+			sbyte overall = resp.status != 0 ? resp.status : resp.textStatus;
+			VCFileStatus fileStatus = (overall >= 0 && overall < k_StatusKindMap.Length)
+				? k_StatusKindMap[overall] : VCFileStatus.None;
+			VCPropertiesStatus propStatus = (resp.propStatus >= 0 && resp.propStatus < k_PropStatusMap.Length)
+				? k_PropStatusMap[resp.propStatus] : VCPropertiesStatus.None;
 
+			// TSVNCacheResponse doesn't expose repo / out-of-date info — that requires "check repository"
+			// which TSVNCache only does on demand. Leave RemoteStatus None; the CLI database still
+			// supplies remote-changes info when "Check repo for changes" is enabled there.
 			VCRemoteFileStatus remoteStatus = VCRemoteFileStatus.None;
-			if (resp.repo_text_status > 1 && resp.repo_text_status <= 14)
-				remoteStatus = VCRemoteFileStatus.Modified;
+
+			VCLockStatus lockStatus = resp.hasLockOwner ? VCLockStatus.LockedOther : VCLockStatus.NoLock;
+			VCTreeConflictStatus treeStatus = resp.treeConflict ? VCTreeConflictStatus.TreeConflict : VCTreeConflictStatus.Normal;
 
 			return new SVNStatusData {
 				Status = fileStatus,
 				PropertiesStatus = propStatus,
-				LockStatus = resp.locked != 0 ? VCLockStatus.LockedHere : VCLockStatus.NoLock,
+				LockStatus = lockStatus,
 				RemoteStatus = remoteStatus,
-				SwitchedExternalStatus = resp.switched != 0 ? VCSwitchedExternal.Switched : VCSwitchedExternal.Normal,
-				TreeConflictStatus = VCTreeConflictStatus.Normal,  // not exposed via this protocol slice
+				SwitchedExternalStatus = VCSwitchedExternal.Normal,  // not exposed via this protocol slice
+				TreeConflictStatus = treeStatus,
 				Path = NativeToAssetPath(nativePath),
 				LockDetails = LockDetails.Empty,
 			};
@@ -422,19 +497,8 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		// ── Diagnostics ──────────────────────────────────────────────────────
 		private static string DumpFirstWords(TSVNCacheResponseHeader h)
 		{
-			// Serialise the struct back to bytes so we can show its raw content in the probe failure message.
-			int sz = System.Runtime.InteropServices.Marshal.SizeOf<TSVNCacheResponseHeader>();
-			byte[] buf = new byte[sz];
-			var pin = System.Runtime.InteropServices.GCHandle.Alloc(buf, System.Runtime.InteropServices.GCHandleType.Pinned);
-			try { System.Runtime.InteropServices.Marshal.StructureToPtr(h, pin.AddrOfPinnedObject(), false); }
-			finally { pin.Free(); }
-
-			var sb = new System.Text.StringBuilder();
-			for (int i = 0; i + 3 < sz; i += 4) {
-				int w = System.BitConverter.ToInt32(buf, i);
-				sb.Append($"[{i/4}]={w} ");
-			}
-			return sb.ToString().TrimEnd();
+			return $"kind={h.kind} needsLock={h.needsLock} treeConflict={h.treeConflict} hasLockOwner={h.hasLockOwner} " +
+			       $"textStatus={h.textStatus} propStatus={h.propStatus} status={h.status} cmtRev={h.cmtRev}";
 		}
 
 		// ── Path helpers ─────────────────────────────────────────────────────		// TSVNCache expects absolute paths with backslashes — never apply ToLower (case-sensitive on the wire).

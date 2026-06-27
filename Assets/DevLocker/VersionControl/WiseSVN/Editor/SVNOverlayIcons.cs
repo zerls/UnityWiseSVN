@@ -42,20 +42,36 @@ namespace DevLocker.VersionControl.WiseSVN
 			EditorApplication.delayCall += ApplySVNMenuIcon;
 		}
 
-#if UNITY_2022_2_OR_NEWER
 		private static void ApplySVNMenuIcon()
 		{
 			var style = SVNPreferencesManager.Instance?.PersonalPrefs.MenuIconStyle ?? WiseSVNMenuIconStyle.Default;
+			Texture2D tex = null;
 			switch (style) {
 				case WiseSVNMenuIconStyle.Clean:
-					{ var tex = TryLoadSvnTexture(); if (tex) UnityEditor.Menu.SetItemIcon("Assets/SVN", tex); }
+					tex = TryLoadSvnTexture();
 					break;
 				case WiseSVNMenuIconStyle.Emoji:
-					// Emoji in the menu path is the visual indicator. No SetItemIcon call.
+					// Emoji in the menu path is the visual indicator. No icon needed.
 					break;
 				default:
-					{ var tex = TryLoadTortoiseSVNLogo() ?? TryLoadSvnTexture(); if (tex) UnityEditor.Menu.SetItemIcon("Assets/SVN", tex); }
+					tex = TryLoadTortoiseSVNLogo() ?? TryLoadSvnTexture();
 					break;
+			}
+			if (tex == null) {
+				Debug.LogWarning($"[WiseSVN] Menu icon: no texture loaded for style={style}, leaving menu unadorned.");
+				return;
+			}
+			try {
+				var method = typeof(UnityEditor.Menu).GetMethod("SetItemIcon",
+					System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+				if (method != null) {
+					method.Invoke(null, new object[] { "Assets/SVN", tex });
+					Debug.Log($"[WiseSVN] Menu.SetItemIcon(\"Assets/SVN\", {tex.width}x{tex.height}) succeeded.");
+				} else {
+					Debug.LogWarning("[WiseSVN] Menu.SetItemIcon not found — possibly unsupported Unity version.");
+				}
+			} catch (System.Exception ex) {
+				Debug.LogWarning($"[WiseSVN] Menu.SetItemIcon failed: {ex.GetType().Name}: {ex.Message}");
 			}
 		}
 
@@ -69,7 +85,7 @@ namespace DevLocker.VersionControl.WiseSVN
 				var data = System.IO.File.ReadAllBytes(path);
 				var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
 				if (tex.LoadImage(data)) return tex;
-				Object.DestroyImmediate(tex);
+				UnityEngine.Object.DestroyImmediate(tex);
 			} catch { /* fall through */ }
 			return null;
 		}
@@ -79,9 +95,6 @@ namespace DevLocker.VersionControl.WiseSVN
 			return EditorGUIUtility.Load("SVNOverlayIcons/SVNNormalIcon.png") as Texture2D
 				?? EditorGUIUtility.Load("SVNOverlayIcons/SVNConflictIcon.png") as Texture2D;
 		}
-#else
-		private static void ApplySVNMenuIcon() { /* Menu.SetItemIcon unavailable before 2022.2 */ }
-#endif
 
 		// Re-subscribe to StatusesChanged when the provider upgrades (CLI → TSVNCache).
 		private static void OnStatusProviderChanged()
@@ -185,9 +198,18 @@ namespace DevLocker.VersionControl.WiseSVN
 				return;
 			}
 
-			// Route through the active status provider — TSVNCache on Windows when available, CLI database otherwise.
+			// Route through the active status provider.
 			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
 			var statusData = SVNPreferencesManager.Instance.StatusProvider.GetStatus(assetPath);
+
+			// TSVNCache may return None for paths not yet queried (cache miss). Fall back to the
+			// CLI database so unversioned-folder items correctly show the unversioned icon regardless
+			// of the ShowNormal toggle state.
+			if (statusData.Status == VCFileStatus.None) {
+				var dbStatus = SVNStatusesDatabase.Instance.GetKnownStatusData(guid);
+				if (dbStatus.Status == VCFileStatus.Unversioned)
+					statusData = dbStatus;
+			}
 
 			var downloadRepositoryChanges = SVNPreferencesManager.Instance.DownloadRepositoryChanges && !SVNPreferencesManager.Instance.NeedsToAuthenticate;
 			var lockPrompt = SVNPreferencesManager.Instance.ProjectPrefs.EnableLockPrompt;
