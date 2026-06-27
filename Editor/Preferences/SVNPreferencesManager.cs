@@ -35,6 +35,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		[Serializable]
 		internal class PersonalPreferences
 		{
+			// Master kill-switch. When true the plugin does nothing — no file hooks, no icons,
+			// no SVN calls. Useful when working offline or on non-SVN branches.
+			// Default false → plugin runs normally.
+			public bool PluginDisabled = false;
+
 			public bool EnableCoreIntegration = true;		// Sync file operations with SVN
 			public bool PopulateStatusesDatabase = true;    // For overlay icons etc.
 			public bool PopulateIgnoresDatabase = true;    // For svn-ignored icons etc.
@@ -60,6 +65,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			public WiseSVNIconStyle IconStyle = WiseSVNIconStyle.Classic;
 			public string TortoiseSVNTheme = "Win10";
+			public WiseSVNMenuIconStyle MenuIconStyle = WiseSVNMenuIconStyle.Default;
 
 			// Status badge display locations (each independently toggled).
 			public bool ShowSVNStatusToolbar  = true;   // Unity main toolbar (top bar)
@@ -172,6 +178,12 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		public PersonalPreferences PersonalPrefs;
 		public ProjectPreferences ProjectPrefs;
 
+		// Convenience: true when the master kill-switch is OFF and core integration is ON.
+		// Use this everywhere instead of reading PersonalPrefs.EnableCoreIntegration directly
+		// so PluginDisabled=true shuts everything down in one place.
+		public bool IsIntegrationEnabled =>
+			PersonalPrefs != null && !PersonalPrefs.PluginDisabled && PersonalPrefs.EnableCoreIntegration;
+
 		public bool TemporarySilenceLockPrompts = false;
 
 
@@ -187,40 +199,85 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			: PersonalPrefs.DownloadRepositoryChanges == BoolPreference.Enabled;
 
 
-		// Active status provider — TSVNCache on Windows (when available + preferred), CLI fallback otherwise.
-		// Resolved lazily on first access, then cached for the session.
+		// Active status provider — always starts as CLIDatabaseStatusProvider so [InitializeOnLoad]
+		// static constructors never block. On Windows with PreferTSVNCache=true, an async probe
+		// runs after Unity finishes loading (EditorApplication.delayCall); if it succeeds the
+		// provider is upgraded to TSVNCacheStatusProvider and StatusProviderChanged fires.
 		private ISVNStatusProvider m_StatusProvider;
-		private string m_StatusProviderProbeMessage;  // populated when TSVNCache probe fails — shown in diagnostic UI
+		private string m_StatusProviderProbeMessage;
+
+		// Raised when the provider is upgraded (CLI → TSVNCache) after the async probe.
+		public event Action StatusProviderChanged;
+
 		public ISVNStatusProvider StatusProvider {
 			get {
-				if (m_StatusProvider == null) {
-					m_StatusProvider = ResolveStatusProvider();
-				}
+				// Always has a value — set in Initialize() before any [InitializeOnLoad] ctor runs.
+				if (m_StatusProvider == null)
+					m_StatusProvider = new CLIDatabaseStatusProvider();
 				return m_StatusProvider;
 			}
 		}
 		public string StatusProviderProbeMessage => m_StatusProviderProbeMessage;
 
-		private ISVNStatusProvider ResolveStatusProvider()
+		// Async probe — runs the named-pipe connection on a worker thread so it cannot block
+		// Unity's main thread, even if TSVNCache.exe hangs or the pipe never responds.
+		// On success we re-enter the main thread via EditorApplication.delayCall to swap the
+		// provider and raise StatusProviderChanged. Probe failures stay silent (CLI stays active).
+		[System.NonSerialized] private volatile bool m_StatusProviderProbeStarted;
+
+		private void ProbeAndUpgradeProvider()
 		{
 #if UNITY_EDITOR_WIN
-			if (PersonalPrefs != null && PersonalPrefs.PreferTSVNCache) {
-				if (TSVNCacheStatusProvider.Probe(out var reason)) {
-					Debug.Log("[WiseSVN] Status source: TSVNCache (TortoiseSVN's shared cache).");
-					m_StatusProviderProbeMessage = "Connected.";
-					return new TSVNCacheStatusProvider();
-				}
-				m_StatusProviderProbeMessage = reason;
-				Debug.Log($"[WiseSVN] TSVNCache unavailable ({reason}); using CLI status database fallback.");
+			if (m_StatusProviderProbeStarted) return;
+			if (PersonalPrefs == null || !PersonalPrefs.PreferTSVNCache) {
+				m_StatusProviderProbeMessage = "PreferTSVNCache is off.";
+				return;
 			}
+			m_StatusProviderProbeStarted = true;
+
+			var thread = new System.Threading.Thread(() => {
+				bool ok;
+				string reason;
+				try {
+					ok = TSVNCacheStatusProvider.Probe(out reason);
+				} catch (System.Exception ex) {
+					ok = false;
+					reason = "Probe threw: " + ex.GetType().Name + ": " + ex.Message;
+				}
+
+				// Hop back to the main thread to swap the provider — touching SVNStatusBadge /
+				// SceneView / Unity API from a worker thread would crash.
+				EditorApplication.delayCall += () => {
+					if (ok) {
+						Debug.Log("[WiseSVN] Status source upgraded to TSVNCache (TortoiseSVN shared cache).");
+						m_StatusProviderProbeMessage = "Connected.";
+						m_StatusProvider = new TSVNCacheStatusProvider();
+						StatusProviderChanged?.Invoke();
+					} else {
+						m_StatusProviderProbeMessage = reason;
+						Debug.Log("[WiseSVN] TSVNCache unavailable (" + reason + "); keeping CLI status database.");
+					}
+				};
+			}) {
+				Name = "WiseSVN.TSVNCacheProbe",
+				IsBackground = true,
+			};
+			thread.Start();
 #else
 			m_StatusProviderProbeMessage = "TSVNCache is Windows-only.";
 #endif
-			return new CLIDatabaseStatusProvider();
 		}
 
 		public override void Initialize(bool freshlyCreated)
 		{
+			// Ensure a provider exists immediately — consumers access it inside [InitializeOnLoad]
+			// static constructors, so it must never be null and must never block.
+			if (m_StatusProvider == null)
+				m_StatusProvider = new CLIDatabaseStatusProvider();
+
+			// Probe TSVNCache after Unity finishes loading (avoids blocking the startup path).
+			EditorApplication.delayCall += ProbeAndUpgradeProvider;
+
 			var lastModifiedDate = File.Exists(PROJECT_PREFERENCES_PATH)
 				? File.GetLastWriteTime(PROJECT_PREFERENCES_PATH).Ticks
 				: 0

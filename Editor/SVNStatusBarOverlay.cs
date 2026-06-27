@@ -231,13 +231,30 @@ namespace DevLocker.VersionControl.WiseSVN
 			var items = new List<SVNStatusBadgePopup.Item>();
 			bool hasSelection = SVNContextMenusManager.HasSelectedAssets();
 
+			// ── Conflict banner (P1-3) ────────────────────────────────────
+			// When the working copy has conflicts, surface a one-click jump to "Check Changes" at the top.
+			var (modified, _, conflict) = CountStatuses();
+			if (conflict) {
+				items.Add(new SVNStatusBadgePopup.Item {
+					Label   = string.Format(Tr("overlay.svnstatus.menu.conflict_banner"), modified),
+					OnClick = SVNContextMenusManager.CheckChangesAll,
+					Enabled = true,
+				});
+				items.Add(SVNStatusBadgePopup.Item.Separator);
+			}
+
+			int selCount = hasSelection ? Selection.assetGUIDs.Length : 0;
 			items.Add(new SVNStatusBadgePopup.Item {
-				Label   = Tr("overlay.svnstatus.menu.update_selected"),
+				Label   = hasSelection
+					? string.Format(Tr("overlay.svnstatus.menu.update_selected_n"), selCount)
+					: Tr("overlay.svnstatus.menu.update_selected_none"),
 				OnClick = SVNContextMenusManager.UpdateSelected,
 				Enabled = hasSelection,
 			});
 			items.Add(new SVNStatusBadgePopup.Item {
-				Label   = Tr("overlay.svnstatus.menu.commit_selected"),
+				Label   = hasSelection
+					? string.Format(Tr("overlay.svnstatus.menu.commit_selected_n"), selCount)
+					: Tr("overlay.svnstatus.menu.commit_selected_none"),
 				OnClick = SVNContextMenusManager.CommitSelected,
 				Enabled = hasSelection,
 			});
@@ -263,8 +280,20 @@ namespace DevLocker.VersionControl.WiseSVN
 				OnClick = () => { BranchName = string.Empty; RefreshBranch(); },
 				Enabled = true,
 			});
+			// ── P2-3: extra quick-access entries ──────────────────────────
+			items.Add(SVNStatusBadgePopup.Item.Separator);
+			items.Add(new SVNStatusBadgePopup.Item {
+				Label   = "⚙ " + Tr("overlay.svnstatus.menu.preferences"),
+				OnClick = SVNPreferencesWindow.ShowProjectPreferences,
+				Enabled = true,
+			});
+			items.Add(new SVNStatusBadgePopup.Item {
+				Label   = "☱ " + Tr("overlay.svnstatus.menu.show_log_all"),
+				OnClick = SVNContextMenusManager.ShowLogAll,
+				Enabled = true,
+			});
 
-			PopupWindow.Show(badgeRect, new SVNStatusBadgePopup(items));
+			UnityEditor.PopupWindow.Show(badgeRect, new SVNStatusBadgePopup(items));
 		}
 	}
 
@@ -412,11 +441,18 @@ namespace DevLocker.VersionControl.WiseSVN
 
 		static SVNMainToolbarInjector()
 		{
-			// Subscribe via the active provider — TSVNCache or CLI fire StatusesChanged uniformly.
 			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += OnDatabaseChanged;
-			SVNPreferencesManager.Instance.PreferencesChanged += OnPrefsChanged;
-			SVNStatusBadge.TooltipChanged                    += RefreshTooltip;
+			SVNPreferencesManager.Instance.StatusProviderChanged          += OnProviderUpgraded;
+			SVNPreferencesManager.Instance.PreferencesChanged             += OnPrefsChanged;
+			SVNStatusBadge.TooltipChanged                                 += RefreshTooltip;
 			EditorApplication.delayCall += TryInject;
+		}
+
+		// Re-subscribe after CLI → TSVNCache upgrade.
+		static void OnProviderUpgraded()
+		{
+			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += OnDatabaseChanged;
+			OnDatabaseChanged();
 		}
 
 		static void OnDatabaseChanged()
@@ -506,6 +542,9 @@ namespace DevLocker.VersionControl.WiseSVN
 		static SVNTitleBarUpdater()
 		{
 			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += () => s_Pending = true;
+			SVNPreferencesManager.Instance.StatusProviderChanged          += () => {
+				SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += () => s_Pending = true;
+			};
 			SVNPreferencesManager.Instance.PreferencesChanged += OnPrefsChanged;
 			EditorApplication.update += Tick;
 

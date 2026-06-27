@@ -20,7 +20,7 @@ namespace DevLocker.VersionControl.WiseSVN
 	{
 		private static SVNPreferencesManager.PersonalPreferences m_PersonalPrefs => SVNPreferencesManager.Instance.PersonalPrefs;
 
-		private static bool IsActive => m_PersonalPrefs.EnableCoreIntegration && (m_PersonalPrefs.PopulateStatusesDatabase || SVNPreferencesManager.Instance.ProjectPrefs.EnableLockPrompt);
+		private static bool IsActive => SVNPreferencesManager.Instance.IsIntegrationEnabled && (m_PersonalPrefs.PopulateStatusesDatabase || SVNPreferencesManager.Instance.ProjectPrefs.EnableLockPrompt);
 
 		private static bool m_ShowNormalStatusIcons = false;
 		private static bool m_ShowExcludeStatusIcons = false;
@@ -33,10 +33,61 @@ namespace DevLocker.VersionControl.WiseSVN
 		static SVNOverlayIcons()
 		{
 			SVNPreferencesManager.Instance.PreferencesChanged += PreferencesChanged;
-			// Subscribe to whichever status source is currently active (TSVNCache or CLI database).
+			SVNPreferencesManager.Instance.StatusProviderChanged += OnStatusProviderChanged;
 			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += OnDatabaseChanged;
 
 			PreferencesChanged();
+
+			// Set an icon on the Assets/SVN root menu item. Must run after Unity's menu system is ready.
+			EditorApplication.delayCall += ApplySVNMenuIcon;
+		}
+
+#if UNITY_2022_2_OR_NEWER
+		private static void ApplySVNMenuIcon()
+		{
+			var style = SVNPreferencesManager.Instance?.PersonalPrefs.MenuIconStyle ?? WiseSVNMenuIconStyle.Default;
+			switch (style) {
+				case WiseSVNMenuIconStyle.Clean:
+					{ var tex = TryLoadSvnTexture(); if (tex) UnityEditor.Menu.SetItemIcon("Assets/SVN", tex); }
+					break;
+				case WiseSVNMenuIconStyle.Emoji:
+					// Emoji in the menu path is the visual indicator. No SetItemIcon call.
+					break;
+				default:
+					{ var tex = TryLoadTortoiseSVNLogo() ?? TryLoadSvnTexture(); if (tex) UnityEditor.Menu.SetItemIcon("Assets/SVN", tex); }
+					break;
+			}
+		}
+
+		private static Texture2D TryLoadTortoiseSVNLogo()
+		{
+			try {
+				string path = System.IO.Path.Combine(
+					System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles),
+					"TortoiseSVN", "bin", "tsvn-logo.png");
+				if (!System.IO.File.Exists(path)) return null;
+				var data = System.IO.File.ReadAllBytes(path);
+				var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
+				if (tex.LoadImage(data)) return tex;
+				Object.DestroyImmediate(tex);
+			} catch { /* fall through */ }
+			return null;
+		}
+
+		private static Texture2D TryLoadSvnTexture()
+		{
+			return EditorGUIUtility.Load("SVNOverlayIcons/SVNNormalIcon.png") as Texture2D
+				?? EditorGUIUtility.Load("SVNOverlayIcons/SVNConflictIcon.png") as Texture2D;
+		}
+#else
+		private static void ApplySVNMenuIcon() { /* Menu.SetItemIcon unavailable before 2022.2 */ }
+#endif
+
+		// Re-subscribe to StatusesChanged when the provider upgrades (CLI → TSVNCache).
+		private static void OnStatusProviderChanged()
+		{
+			SVNPreferencesManager.Instance.StatusProvider.StatusesChanged += OnDatabaseChanged;
+			OnDatabaseChanged();
 		}
 
 		private static void PreferencesChanged()
@@ -55,8 +106,9 @@ namespace DevLocker.VersionControl.WiseSVN
 			OnDatabaseChanged();
 		}
 
-		public const string InvalidateDatabaseMenuText = "Assets/SVN/Refresh Icons && Locks";
+		public const string InvalidateDatabaseMenuText = "Assets/SVN/\U0001F504  Refresh Icons && Locks";
 		[MenuItem(InvalidateDatabaseMenuText + " %&r", false, ContextMenus.SVNContextMenusManager.MenuItemPriorityStart + 145)]
+		[MenuItem("Window/Version Control/SVN/\U0001F504  Refresh Icons && Locks %&r", false, ContextMenus.SVNContextMenusManager.WindowMenuPriority + 60)]
 		public static void InvalidateDatabaseMenu()
 		{
 			if (!SVNPreferencesManager.Instance.PersonalPrefs.EnableCoreIntegration || !SVNPreferencesManager.Instance.PersonalPrefs.PopulateStatusesDatabase) {

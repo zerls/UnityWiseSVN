@@ -43,9 +43,42 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 
 		private const double k_CacheTTL = 5.0;          // seconds — TSVNCache itself is reactive, so short TTL is fine
 		private const int k_PipeTimeoutMs = 200;        // hard ceiling on a single sync query
-		private const int k_ProbeTimeoutMs = 1500;      // generous on probe; only runs once
-		private const string k_StatusPipeName = "TSVNCache";       // \\.\pipe\TSVNCache
-		private const string k_CommandPipeName = "TSVNCacheCommand";
+		private const int k_ProbeTimeoutMs = 300;       // short — probe runs on worker thread but still don't waste time
+		// Pipe names — discovered at runtime because newer TortoiseSVN versions append the
+		// Windows session ID: \\.\pipe\TSVNCache_1  / \\.\pipe\TSVNCacheCommand_1.
+		// s_StatusPipeName / s_CommandPipeName are resolved once on first use.
+		private static string s_StatusPipeName;
+		private static string s_CommandPipeName;
+
+		private static string StatusPipeName  => s_StatusPipeName  ?? (s_StatusPipeName  = FindPipe("TSVNCache",        "TSVNCacheCommand"));
+		private static string CommandPipeName => s_CommandPipeName ?? (s_CommandPipeName = FindPipe("TSVNCacheCommand", null));
+
+		// Scan \\.\pipe\ for the first pipe whose name starts with `prefix` but NOT with `exclude`.
+		// Wrapped in a 500ms watchdog Task — Directory.GetFiles(@"\\.\pipe\") has been known
+		// to block on certain machines (AV / sandboxed environments). If it doesn't return
+		// quickly we fall back to the bare prefix and let the actual Connect() attempt fail fast.
+		private static string FindPipe(string prefix, string exclude)
+		{
+			string result = null;
+			try {
+				var task = System.Threading.Tasks.Task.Run(() => {
+					try {
+						foreach (var p in System.IO.Directory.GetFiles(@"\\.\pipe\")) {
+							string n = System.IO.Path.GetFileName(p);
+							if (n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) {
+								if (exclude != null && n.StartsWith(exclude, StringComparison.OrdinalIgnoreCase))
+									continue;
+								return n;
+							}
+						}
+					} catch { /* fall through */ }
+					return null;
+				});
+				if (task.Wait(500))
+					result = task.Result;
+			} catch { /* watchdog itself failed — fall through */ }
+			return result ?? prefix;  // bare name as last resort
+		}
 
 		// Public so the diagnostic window can surface it.
 		public long LastQueryLatencyTicks { get; private set; }
@@ -59,8 +92,19 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		public static bool Probe(out string failureReason)
 		{
 			failureReason = null;
+
+			// Fast-fail check — if TSVNCache.exe isn't running there's nothing to connect to.
+			// Skipping the pipe-open call avoids the rare case where Connect() blocks past its timeout.
 			try {
-				using (var pipe = new NamedPipeClientStream(".", k_StatusPipeName, PipeDirection.InOut, PipeOptions.None)) {
+				var procs = System.Diagnostics.Process.GetProcessesByName("TSVNCache");
+				if (procs == null || procs.Length == 0) {
+					failureReason = "TSVNCache.exe process not running";
+					return false;
+				}
+			} catch { /* enumerating processes can rarely throw; fall through to actual pipe probe */ }
+
+			try {
+				using (var pipe = new NamedPipeClientStream(".", StatusPipeName, PipeDirection.InOut, PipeOptions.Asynchronous)) {
 					pipe.Connect(k_ProbeTimeoutMs);
 					// Send a request for the project root and check we get a coherent response.
 					string projectRoot = WiseSVNIntegration.ProjectRootNative;
@@ -79,7 +123,9 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 					}
 					// Sanity check: text_status must be in [1..14] (svn_wc_status_kind range).
 					if (resp.text_status < 1 || resp.text_status > 14) {
-						failureReason = $"Invalid text_status={resp.text_status} (protocol mismatch?)";
+						failureReason = $"Invalid text_status={resp.text_status} (expected 1–14). " +
+							$"First 8 int-words of response: " +
+							DumpFirstWords(resp);
 						return false;
 					}
 					return true;
@@ -226,6 +272,10 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			header = default;
 			error = null;
 			try {
+				// Set a read deadline so we don't block indefinitely if the server sends nothing.
+				// Only valid when the pipe was opened with PipeOptions.Asynchronous.
+				try { pipe.ReadTimeout = 800; } catch { /* not all streams support this */ }
+
 				int size = Marshal.SizeOf<TSVNCacheResponseHeader>();
 				var buffer = new byte[size];
 				int read = 0;
@@ -263,7 +313,7 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		{
 			var sw = System.Diagnostics.Stopwatch.StartNew();
 			try {
-				using (var pipe = new NamedPipeClientStream(".", k_StatusPipeName, PipeDirection.InOut, PipeOptions.None)) {
+				using (var pipe = new NamedPipeClientStream(".", StatusPipeName, PipeDirection.InOut, PipeOptions.Asynchronous)) {
 					pipe.Connect(k_PipeTimeoutMs);
 					if (!WriteRequest(pipe, nativePath, recursive: false)) {
 						LastQueryErrors++;
@@ -293,7 +343,7 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		private void SendCommand(int command, string nativePath)
 		{
 			try {
-				using (var pipe = new NamedPipeClientStream(".", k_CommandPipeName, PipeDirection.Out, PipeOptions.None)) {
+				using (var pipe = new NamedPipeClientStream(".", CommandPipeName, PipeDirection.Out, PipeOptions.None)) {
 					pipe.Connect(k_PipeTimeoutMs);
 					var buffer = new byte[4 + 260 * 2];
 					BitConverter.GetBytes(command).CopyTo(buffer, 0);
@@ -369,8 +419,25 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			};
 		}
 
-		// ── Path helpers ─────────────────────────────────────────────────────
-		// TSVNCache expects absolute paths with backslashes — never apply ToLower (case-sensitive on the wire).
+		// ── Diagnostics ──────────────────────────────────────────────────────
+		private static string DumpFirstWords(TSVNCacheResponseHeader h)
+		{
+			// Serialise the struct back to bytes so we can show its raw content in the probe failure message.
+			int sz = System.Runtime.InteropServices.Marshal.SizeOf<TSVNCacheResponseHeader>();
+			byte[] buf = new byte[sz];
+			var pin = System.Runtime.InteropServices.GCHandle.Alloc(buf, System.Runtime.InteropServices.GCHandleType.Pinned);
+			try { System.Runtime.InteropServices.Marshal.StructureToPtr(h, pin.AddrOfPinnedObject(), false); }
+			finally { pin.Free(); }
+
+			var sb = new System.Text.StringBuilder();
+			for (int i = 0; i + 3 < sz; i += 4) {
+				int w = System.BitConverter.ToInt32(buf, i);
+				sb.Append($"[{i/4}]={w} ");
+			}
+			return sb.ToString().TrimEnd();
+		}
+
+		// ── Path helpers ─────────────────────────────────────────────────────		// TSVNCache expects absolute paths with backslashes — never apply ToLower (case-sensitive on the wire).
 		private static string ToNativePath(string assetPath)
 		{
 			if (Path.IsPathRooted(assetPath))
