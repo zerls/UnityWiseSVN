@@ -2401,9 +2401,15 @@ namespace DevLocker.VersionControl.WiseSVN
 		// Assets/ArtPrototyping/foo.png
 		internal static bool ArePathsNested(string parentPath, string childPath)
 		{
+			if (string.IsNullOrEmpty(parentPath) || string.IsNullOrEmpty(childPath))
+				return false;
+
 			if (parentPath.EndsWith('/')) {
 				parentPath = parentPath.TrimEnd('/');
 			}
+
+			if (string.IsNullOrEmpty(parentPath))
+				return false;
 
 			return childPath.StartsWith(parentPath, StringComparison.OrdinalIgnoreCase) &&
 				(childPath.Length == parentPath.Length || childPath[parentPath.Length] == '/');

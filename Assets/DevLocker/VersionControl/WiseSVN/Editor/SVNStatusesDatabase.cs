@@ -74,7 +74,7 @@ namespace DevLocker.VersionControl.WiseSVN
 		/// <summary>
 		/// The database update can be enabled, but the SVN integration to be disabled as a whole.
 		/// </summary>
-		public override bool IsActive => m_PersonalPrefs.PopulateStatusesDatabase && m_PersonalPrefs.EnableCoreIntegration;
+		public override bool IsActive => SVNPreferencesManager.Instance.IsIntegrationEnabled && m_PersonalPrefs.PopulateStatusesDatabase;
 		public override bool TemporaryDisabled => WiseSVNIntegration.TemporaryDisabled || WiseSVNIntegration.IsBuildingPlayer;
 		public override bool DoTraceLogs => (m_PersonalCachedPrefs.TraceLogs & SVNTraceLogs.DatabaseUpdates) != 0;
 
@@ -279,17 +279,35 @@ namespace DevLocker.VersionControl.WiseSVN
 					.Select(s => new GuidStatusDatasBind() { MergedStatusData = s })
 					.ToArray();
 
-				string projectRootPath = WiseSVNIntegration.ProjectRootNative + '\\';
+				// Strip project-root prefix so entries become relative (e.g. "Assets/Library").
+				// Strip with both slash flavours because GatherIgnoresInThread converts '\\' → '/'
+				// before the paths reach here, so the native-backslash projectRootPath won't match.
+				string projectRootPath  = WiseSVNIntegration.ProjectRootNative + '\\';
+				string projectRootPathF = WiseSVNIntegration.ProjectRootNative.Replace('\\', '/') + '/';
+
 				m_IgnoredEntries = ignoredEntries
-					.Select(path => path.Replace(projectRootPath, ""))
+					.Select(path => path.Replace(projectRootPath, ""))      // strip if backslash root matched
+					.Select(path => path.Replace(projectRootPathF, ""))     // strip if forward-slash root matched
 					.Select(path => path.Replace('\\', '/'))
+					.Where(path => path.Contains('/'))                      // must be a proper relative sub-path, not a bare name
+					.Where(path => path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+					            || path.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase))
 					.Distinct()
 					.ToArray();
+
+				// Log first-time populate for diagnostics (one-shot so no spam).
+				if (DoTraceLogs && m_IgnoredEntries.Length > 0) {
+					Debug.Log($"[WiseSVN] m_IgnoredEntries ({m_IgnoredEntries.Length}): " + string.Join(", ", m_IgnoredEntries.Take(10)));
+				}
 
 				if (!m_GlobalIgnoresCollected) {
 					m_GlobalIgnoredEntries = globalIgnoredEntries
 						.Select(path => path.Replace(projectRootPath, ""))
+						.Select(path => path.Replace(projectRootPathF, ""))
 						.Select(path => path.Replace('\\', '/'))
+						.Where(path => path.Contains('/'))
+						.Where(path => path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+						            || path.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase))
 						.Distinct()
 						.ToArray();
 
@@ -751,6 +769,7 @@ namespace DevLocker.VersionControl.WiseSVN
 
 				foreach (string ignoredPath in m_IgnoredEntries) {
 					if (WiseSVNIntegration.ArePathsNested(ignoredPath, path)) {
+						LogIgnoreMatch(ignoredPath, path, "svn:ignore");
 						return new SVNStatusData() { Path = path, Status = VCFileStatus.Ignored, LockDetails = LockDetails.Empty };
 					}
 				}
@@ -761,12 +780,24 @@ namespace DevLocker.VersionControl.WiseSVN
 
 				foreach (string ignoredPath in m_GlobalIgnoredEntries) {
 					if (WiseSVNIntegration.ArePathsNested(ignoredPath, path)) {
+						LogIgnoreMatch(ignoredPath, path, "svn:global-ignores");
 						return new SVNStatusData() { Path = path, Status = VCFileStatus.Ignored, LockDetails = LockDetails.Empty };
 					}
 				}
 			}
 
 			return new SVNStatusData() { Status = VCFileStatus.None };
+		}
+
+		// Fires once per unique (ignoredPath, source) combination so the log isn't spammed every frame.
+		private static HashSet<string> s_LoggedIgnoreMatches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		private static void LogIgnoreMatch(string ignoredPath, string assetPath, string source)
+		{
+			string key = $"{source}|{ignoredPath}";
+			if (s_LoggedIgnoreMatches.Add(key)) {
+				Debug.LogWarning($"[WiseSVN] {source} entry \"{ignoredPath}\" matched asset \"{assetPath}\" → showing as Ignored. " +
+					$"If this is wrong, check your svn:ignore / svn:global-ignores on the parent folder.");
+			}
 		}
 
 		public IEnumerable<SVNStatusData> GetAllKnownStatusData(string guid, bool mergedData, bool assetData, bool metaData)

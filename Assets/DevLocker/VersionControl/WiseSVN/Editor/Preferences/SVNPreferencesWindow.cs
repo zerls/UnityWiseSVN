@@ -45,8 +45,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			{ "The Pythagorean Siphon Inside Your Washing Machine", "https://www.youtube.com/watch?v=Cg8KQfaT9xY" },
 		};
 
-		public const string PROJECT_PREFERENCES_MENU = "Assets/SVN/SVN Preferences";
-		[MenuItem(PROJECT_PREFERENCES_MENU, false, SVNContextMenusManager.MenuItemPriorityStart + 150)]
+		public const string PROJECT_PREFERENCES_MENU = "Window/Version Control/SVN/⚙  SVN Preferences";
+		[MenuItem(PROJECT_PREFERENCES_MENU, false, SVNContextMenusManager.WindowMenuPriority)]
 		public static void ShowProjectPreferences()
 		{
 			ShowProjectPreferences(PreferencesTab.Personal);
@@ -100,6 +100,24 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			const float labelWidthAdd = 40;
 			EditorGUIUtility.labelWidth += labelWidthAdd;
+
+			EditorGUILayout.Space();
+
+			// ── Master kill-switch ────────────────────────────────────────────────
+			// Shown at the top regardless of the selected tab so it's always visible.
+			bool wasDisabled = m_PersonalPrefs.PluginDisabled;
+			var prevBg       = GUI.backgroundColor;
+			GUI.backgroundColor = wasDisabled ? new Color(1f, 0.35f, 0.35f, 1f) : new Color(0.35f, 0.80f, 0.35f, 1f);
+			bool toggleClicked = GUILayout.Toggle(
+				!wasDisabled,
+				wasDisabled ? Tr("prefs.plugin_disabled_banner") : Tr("prefs.plugin_enabled_banner"),
+				EditorStyles.toolbarButton,
+				GUILayout.Height(22f));
+			GUI.backgroundColor = prevBg;
+			// The toggle returns the new "enabled" state, so if it differs from the original "enabled" (i.e. !wasDisabled), the user clicked.
+			if (toggleClicked == wasDisabled) {
+				m_PersonalPrefs.PluginDisabled = !toggleClicked;
+			}
 
 			EditorGUILayout.Space();
 
@@ -253,6 +271,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 		private void DrawPersonalPreferences()
 		{
+			if (m_PersonalPrefs.PluginDisabled) {
+				EditorGUILayout.HelpBox(Tr("prefs.plugin_disabled_hint"), MessageType.Warning);
+				EditorGUILayout.Space();
+			}
+
 			EditorGUILayout.HelpBox(Tr("prefs.personal.help"), MessageType.Info);
 
 			var sp = m_SerializedObject.FindProperty("m_PersonalPrefs");
@@ -304,6 +327,9 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				}
 			}
 
+			m_PersonalPrefs.MenuIconStyle = (WiseSVNMenuIconStyle) EditorGUILayout.EnumPopup(
+				TrContent("prefs.menu_icon_style", "prefs.menu_icon_style.tooltip"), m_PersonalPrefs.MenuIconStyle);
+
 			EditorGUILayout.Space(4);
 			EditorGUILayout.LabelField(TrContent("prefs.statusbar_header", "prefs.statusbar_header.tooltip"), EditorStyles.boldLabel);
 			m_PersonalPrefs.ShowSVNStatusToolbar  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_toolbar",  "prefs.statusbar_toolbar.tooltip"),  m_PersonalPrefs.ShowSVNStatusToolbar);
@@ -325,6 +351,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				DrawBranchColorRulesList();
 				m_PersonalPrefs.DefaultBranchColor = EditorGUILayout.ColorField(TrContent("prefs.statusbar_branch_default_color", "prefs.statusbar_branch_default_color.tooltip"), m_PersonalPrefs.DefaultBranchColor);
 			}
+
 			EditorGUILayout.Space(4);
 
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);

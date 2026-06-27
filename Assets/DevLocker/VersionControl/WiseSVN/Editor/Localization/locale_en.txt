@@ -38,6 +38,9 @@ prefs.personal.help=These are personal preferences stored in the registry.\nHint
 prefs.project.help=These settings will be saved in the ProjectSettings folder.\nFeel free to add them to your version control system.\nCoordinate any changes here with your team.
 
 prefs.save_changes=Save changes:
+prefs.plugin_enabled_banner=✔ WiseSVN is ENABLED — click to disable
+prefs.plugin_disabled_banner=✖ WiseSVN is DISABLED — click to enable
+prefs.plugin_disabled_hint=WiseSVN is currently disabled. All SVN hooks, overlay icons, and status scans are turned off. Click the banner above to re-enable.
 prefs.enable_svn=Enable SVN integration
 prefs.enable_overlay_icons=Enable overlay icons
 prefs.enable_overlay_icons.tooltip=Enables overlay icons in the project windows.\nPopulates internal cache with statuses of changed entities.\nFile changes may trigger repopulation of the cache.
@@ -46,6 +49,8 @@ prefs.icon_style.tooltip=Classic uses the bundled PNG overlay icons (original To
 prefs.icon_theme=TortoiseSVN Theme
 prefs.icon_theme.tooltip=Choose which TortoiseOverlays icon theme to use. Themes are read from the TortoiseOverlays installation directory.
 prefs.icon_theme.not_found=TortoiseOverlays not found. Install TortoiseSVN to enable this option.
+prefs.menu_icon_style=Asset menu icon style
+prefs.menu_icon_style.tooltip=Presentation of the "Assets/SVN/" shortcut-menu header icon.\n\nDefault: load from TortoiseSVN installation when available, fall back to built-in PNG.\nClean: built-in Unity icons only.\nEmoji: Unicode prefix in the menu path (no extra icon).
 prefs.statusbar_header=SVN Status Badge
 prefs.statusbar_header.tooltip=Controls where the SVN status badge (branch name + change counts) is displayed.
 prefs.statusbar_toolbar=Show in Main Toolbar
@@ -69,8 +74,8 @@ prefs.statusbar_branch_default_color.tooltip=Fallback color used when no rule ma
 prefs.statusbar_branch_rule_add=+ Add Rule
 prefs.scan_svn_ignores=Scan for svn-ignores
 prefs.scan_svn_ignores.tooltip=Enables svn-ignore overlay icons in the project windows. If disabled, svn-ignored items will be considered as Normal status (green icon).
-prefs.show_normal_icon=Show icon for items not in SVN
-prefs.show_normal_icon.tooltip=Display an "unversioned" overlay icon on items the statuses database doesn't recognize. These are typically newly created files not yet committed to SVN. Disable to leave such items without any indicator.
+prefs.show_normal_icon=Show Normal (clean) status icon
+prefs.show_normal_icon.tooltip=Show a green checkmark icon on files and folders that are tracked by SVN and have no local changes.\n\nThese files do not appear in the statuses database because `svn status` only reports files with changes. Disable this to hide the green icon and keep the Project window uncluttered.
 prefs.show_excluded_icon=Show Ignore & Excluded gray icon
 prefs.show_excluded_icon.tooltip=Show gray icon over the items that are svn-ignored or added in the Exclude list. These are non-recursive.
 prefs.refresh_interval=Overlay icons refresh interval
@@ -250,11 +255,18 @@ overlay.svnstatus.disabled=SVN disabled
 overlay.svnstatus.modified=M
 overlay.svnstatus.remote=R
 overlay.svnstatus.menu.update_selected=Update Selected
+overlay.svnstatus.menu.update_selected_n=Update Selected ({0} files)
+overlay.svnstatus.menu.update_selected_none=Update Selected (nothing selected)
 overlay.svnstatus.menu.commit_selected=Commit Selected
+overlay.svnstatus.menu.commit_selected_n=Commit Selected ({0} files)
+overlay.svnstatus.menu.commit_selected_none=Commit Selected (nothing selected)
 overlay.svnstatus.menu.update_all=Update All
 overlay.svnstatus.menu.commit_all=Commit All
 overlay.svnstatus.menu.refresh=Refresh Icons
 overlay.svnstatus.menu.refresh_branch=Refresh Branch Name
+overlay.svnstatus.menu.conflict_banner=⚠ {0} conflict(s) found — click to review
+overlay.svnstatus.menu.preferences=SVN Preferences…
+overlay.svnstatus.menu.show_log_all=Show Log (All)
 overlay.svnstatus.tooltip=Branch: {0}\nModified: {1}\nRemote: {2}\nConflicts: {3}
 
 # ========== SVN Locked Overlay (SceneView) ==========
@@ -282,6 +294,11 @@ overlay.tooltip.broken_lock=You have a lock that is no longer valid (someone els
 overlay.tooltip.locked_other=Someone else locked this file.\nClick for more details.
 overlay.tooltip.locked_stolen=Your lock was stolen by someone else.\nClick for more details.
 overlay.tooltip.remote_changes=Asset is out of date. Update to avoid conflicts.
+
+# ========== Operation Toasts ==========
+toast.update_all_done=SVN: Update All completed.
+toast.commit_all_done=SVN: Commit All completed.
+toast.revert_all_done=SVN: Revert All completed.
 
 # ========== Ignore Manager Window ==========
 ignoremgr.window.title=SVN Ignore Manager

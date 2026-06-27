@@ -38,6 +38,9 @@ prefs.personal.help=以下是存储在注册表中的个人偏好设置。\n提�
 prefs.project.help=以下设置将保存到 ProjectSettings 文件夹中。\n建议将其纳入版本控制系统。\n修改时请与团队成员协调。
 
 prefs.save_changes=保存修改：
+prefs.plugin_enabled_banner=✔ WiseSVN 已启用 — 点击禁用
+prefs.plugin_disabled_banner=✖ WiseSVN 已禁用 — 点击启用
+prefs.plugin_disabled_hint=WiseSVN 当前已禁用。所有 SVN 钩子、覆盖图标和状态扫描均已停止。点击上方横幅重新启用。
 prefs.enable_svn=启用 SVN 集成
 prefs.enable_overlay_icons=启用覆盖图标
 prefs.enable_overlay_icons.tooltip=在 Project 窗口中显示 SVN 状态覆盖图标。\n会维护一份变更实体的状态缓存。\n文件变更可能触发缓存重建。
@@ -46,6 +49,8 @@ prefs.icon_style.tooltip=经典风格使用内置 PNG 覆盖图标（原始 Tort
 prefs.icon_theme=TortoiseSVN 主题
 prefs.icon_theme.tooltip=选择要使用的 TortoiseOverlays 图标主题，主题从 TortoiseOverlays 安装目录读取。
 prefs.icon_theme.not_found=未找到 TortoiseOverlays，请安装 TortoiseSVN 以启用此选项。
+prefs.menu_icon_style=快捷菜单图标风格
+prefs.menu_icon_style.tooltip="Assets/SVN/" 快捷菜单头部图标的呈现方式。\n\nDefault（默认）：有 TortoiseSVN 安装时使用 tsvn-logo，无则使用内置 PNG。\nClean（简洁）：仅使用 Unity 内置图标。\nEmoji：菜单路径中的 Unicode 前缀（无需额外图标文件）。
 prefs.statusbar_header=SVN 状态徽章
 prefs.statusbar_header.tooltip=控制 SVN 状态徽章（分支名 + 变更数量）显示在哪些位置。
 prefs.statusbar_toolbar=显示在主工具栏
@@ -69,8 +74,8 @@ prefs.statusbar_branch_default_color.tooltip=当前分支名未命中任何规�
 prefs.statusbar_branch_rule_add=+ 添加规则
 prefs.scan_svn_ignores=扫描 svn-ignore
 prefs.scan_svn_ignores.tooltip=启用 svn-ignore 覆盖图标。若关闭，svn 已忽略项将被视为 Normal 状态（绿色图标）。
-prefs.show_normal_icon=为未纳入 SVN 的项显示图标
-prefs.show_normal_icon.tooltip=对状态数据库中未识别的项显示"未版本化"覆盖图标——通常是尚未提交到 SVN 的新建文件。关闭后这些项将不显示任何指示标识。
+prefs.show_normal_icon=显示 Normal（已同步）状态图标
+prefs.show_normal_icon.tooltip=对已被 SVN 跟踪且与服务器一致（无本地修改）的文件/文件夹显示绿色对勾图标。\n\n这些文件不会出现在状态数据库中，因为 `svn status` 只输出有变更的文件。关闭后，干净的已跟踪文件不显示任何图标，Project 窗口更整洁。
 prefs.show_excluded_icon=显示已忽略 / 已排除的灰色图标
 prefs.show_excluded_icon.tooltip=为 svn-ignore 项或排除列表中的项显示灰色图标。该判断不递归。
 prefs.refresh_interval=覆盖图标刷新间隔
@@ -250,11 +255,18 @@ overlay.svnstatus.disabled=SVN 已禁用
 overlay.svnstatus.modified=已改
 overlay.svnstatus.remote=远端
 overlay.svnstatus.menu.update_selected=更新选中项
+overlay.svnstatus.menu.update_selected_n=更新选中项（{0} 个文件）
+overlay.svnstatus.menu.update_selected_none=更新选中项（未选中任何文件）
 overlay.svnstatus.menu.commit_selected=提交选中项
+overlay.svnstatus.menu.commit_selected_n=提交选中项（{0} 个文件）
+overlay.svnstatus.menu.commit_selected_none=提交选中项（未选中任何文件）
 overlay.svnstatus.menu.update_all=更新全部
 overlay.svnstatus.menu.commit_all=提交全部
 overlay.svnstatus.menu.refresh=刷新图标
 overlay.svnstatus.menu.refresh_branch=刷新分支名
+overlay.svnstatus.menu.conflict_banner=⚠ 发现 {0} 个冲突 — 点击查看
+overlay.svnstatus.menu.preferences=SVN 偏好设置…
+overlay.svnstatus.menu.show_log_all=查看日志（全部）
 overlay.svnstatus.tooltip=分支：{0}\n本地改动：{1}\n远端改动：{2}\n冲突：{3}
 
 # ========== Scene 视图覆盖警告 ==========
@@ -282,6 +294,11 @@ overlay.tooltip.broken_lock=你持有的锁已失效（被他人夺取并释放�
 overlay.tooltip.locked_other=此文件被他人锁定。\n点击查看详情。
 overlay.tooltip.locked_stolen=你的锁被他人夺取。\n点击查看详情。
 overlay.tooltip.remote_changes=资源已过期，请更新以避免冲突。
+
+# ========== 操作提示 ==========
+toast.update_all_done=SVN：全部更新完成。
+toast.commit_all_done=SVN：全部提交完成。
+toast.revert_all_done=SVN：全部回滚完成。
 
 # ========== 忽略管理器窗口 ==========
 ignoremgr.window.title=SVN 忽略管理器

@@ -171,27 +171,65 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			}
 		}
 
-		[MenuItem("Assets/SVN/\U0001F50D  Diff \u2044 Resolve", true, MenuItemPriorityStart)]
+		// \u2500\u2500 Window menu priority base (positive = after Unity built-ins) \u2500\u2500\u2500\u2500\u2500
+		public const int WindowMenuPriority = 1500;
+
+		// Brief floating notification after an SVN operation completes. Shows in the SceneView / bottom bar.
+		private static void ShowOpToast(string format, params object[] args)
+		{
+			string msg = string.Format(format, args);
+			UnityEngine.Debug.Log("[WiseSVN] " + msg);
+			// Also show in the active SceneView as a transient overlay.
+			var sv = SceneView.lastActiveSceneView;
+			if (sv != null) sv.ShowNotification(new UnityEngine.GUIContent(msg), 2.5);
+		}
+
+		[MenuItem("Assets/SVN/\U0001F50D  Diff \u2044 Resolve %&d", true, MenuItemPriorityStart)]
 		public static bool DiffResolveValidate()
 		{
 			// Might be cool to return false if SVN status is normal or unversioned, but that might slow down the context menu.
 			return Selection.assetGUIDs.Length == 1;
 		}
 
-		[MenuItem("Assets/SVN/\U0001F50D  Diff \u2044 Resolve", false, MenuItemPriorityStart)]
+		// \u2500\u2500 Validate helpers: grey-out menu items when nothing is selected. \u2500\u2500
+		// IMPORTANT: each Validate's [MenuItem] path string must match the action's [MenuItem] path
+		// EXACTLY, including any "%&x" shortcut suffix \u2014 otherwise Unity treats them as separate items.
+
+		[MenuItem("Assets/SVN/\u2197  Commit", true)]
+		private static bool CommitValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\u271a  Add", true)]
+		private static bool AddValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\u21a9  Revert", true)]
+		private static bool RevertValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\U0001F512  Get Locks", true)]
+		private static bool GetLocksValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\U0001F513  Release Locks", true)]
+		private static bool ReleaseLocksValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\u2631  Show Log %&l", true)]
+		private static bool ShowLogValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\U0001F50D  Check Changes %&c", true)]
+		private static bool CheckChangesValidate() => GetSelectedAssetPaths().Any();
+
+		[MenuItem("Assets/SVN/\U0001F50D  Diff \u2044 Resolve %&d", false, MenuItemPriorityStart)]
 		public static void DiffResolve()
 		{
 			CheckChangesSelected();
 		}
 
-		[MenuItem("Assets/SVN/\U0001F50D  Check Changes All", false, MenuItemPriorityStart + 5)]
+		[MenuItem("Window/Version Control/SVN/\U0001F50D  Check Changes (All)", false, WindowMenuPriority + 10)]
 		public static void CheckChangesAll()
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(
 			m_Integration?.CheckChanges(GetRootAssetPath().Concat(SVNStatusesDatabase.Instance.NestedRepositories), false);
 		}
 
-		[MenuItem("Assets/SVN/\U0001F50D  Check Changes", false, MenuItemPriorityStart + 6)]
+		[MenuItem("Assets/SVN/\U0001F50D  Check Changes %&c", false, MenuItemPriorityStart + 6)]
 		public static void CheckChangesSelected()
 		{
 			if (Selection.assetGUIDs.Length > 1) {
@@ -247,6 +285,8 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.Update(GetRootAssetPath().Concat(SVNStatusesDatabase.Instance.NestedRepositories), false, wait: true);
 
 			AssetDatabase.Refresh();
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
+			ShowOpToast(Tr("toast.update_all_done"));
 		}
 
 		// It is recommended to freeze Unity while updating.
@@ -257,6 +297,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.Update(assetPaths, includeMeta, wait: true);
 
 			AssetDatabase.Refresh();
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 		}
 
 		// It is recommended to freeze Unity while updating.
@@ -275,6 +316,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 			m_Integration?.Update(paths, true, wait: true);
 			AssetDatabase.Refresh();
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 		}
 
 		public static bool HasSelectedAssets() => GetSelectedAssetPaths().Any();
@@ -286,6 +328,8 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(
 			m_Integration?.Commit(GetRootAssetPath().Concat(SVNStatusesDatabase.Instance.NestedRepositories), false);
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
+			ShowOpToast(Tr("toast.commit_all_done"));
 		}
 
 		[MenuItem("Assets/SVN/\u2197  Commit", false, MenuItemPriorityStart + 41)]
@@ -305,11 +349,13 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 				var statusData = WiseSVNIntegration.GetStatus(paths[0] + ".meta");
 				if (statusData.Status == VCFileStatus.Normal && !statusData.IsConflicted) {
 					m_Integration?.Commit(paths, false);
+					SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 					return;
 				}
 			}
 
 			m_Integration?.Commit(paths, true);
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 		}
 
 		public static void Commit(IEnumerable<string> assetPaths, bool includeMeta, bool wait = false)
@@ -332,11 +378,14 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Assets/SVN/\u21A9  Revert All", false, MenuItemPriorityStart + 60)]
+		[MenuItem("Window/Version Control/SVN/\u21A9  Revert All", false, WindowMenuPriority + 20)]
 		public static void RevertAll()
 		{
 			// TortoiseSVN handles nested repositories gracefully. SnailSVN - not so much. :(
 			m_Integration?.Revert(GetRootAssetPath().Concat(SVNStatusesDatabase.Instance.NestedRepositories), false, true);
+			AssetDatabase.Refresh();
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
+			ShowOpToast(Tr("toast.revert_all_done"));
 		}
 
 		[MenuItem("Assets/SVN/\u21A9  Revert", false, MenuItemPriorityStart + 61)]
@@ -363,11 +412,14 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 							AssetDatabase.Refresh();
 						}
 					}
+					SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 					return;
 				}
 			}
 
 			m_Integration?.Revert(GetSelectedAssetPaths(), true, true);
+			AssetDatabase.Refresh();
+			SVNPreferencesManager.Instance.StatusProvider.InvalidateAll();
 		}
 
 		public static void Revert(IEnumerable<string> assetPaths, bool includeMeta, bool wait = false)
@@ -470,13 +522,13 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Assets/SVN/\u2631  Show Log All", false, MenuItemPriorityStart + 100)]
+		[MenuItem("Window/Version Control/SVN/\u2631  Show Log (All)", false, WindowMenuPriority + 5)]
 		public static void ShowLogAll()
 		{
 			m_Integration?.ShowLog(GetRootAssetPath().First());
 		}
 
-		[MenuItem("Assets/SVN/\u2631  Show Log", false, MenuItemPriorityStart + 101)]
+		[MenuItem("Assets/SVN/\u2631  Show Log %&l", false, MenuItemPriorityStart + 101)]
 		public static void ShowLogSelected()
 		{
 			m_Integration?.ShowLog(GetSelectedAssetPaths().FirstOrDefault());
@@ -487,7 +539,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.ShowLog(assetPath, wait);
 		}
 
-		[MenuItem("Assets/SVN/\U0001F4C1  Repo Browser", false, MenuItemPriorityStart + 104)]
+		[MenuItem("Window/Version Control/SVN/\U0001F4C1  Repo Browser", false, WindowMenuPriority + 30)]
 		public static void RepoBrowserSelected()
 		{
 			m_Integration?.RepoBrowser(GetSelectedAssetPaths().Select(WiseSVNIntegration.AssetPathToURL).FirstOrDefault());
@@ -517,7 +569,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		}
 
 
-		[MenuItem("Assets/SVN/\U0001F440  Blame", false, MenuItemPriorityStart + 106)]
+		[MenuItem("Window/Version Control/SVN/\U0001F440  Blame", false, WindowMenuPriority + 35)]
 		public static void BlameSelected()
 		{
 			m_Integration?.Blame(GetSelectedAssetPaths().FirstOrDefault());
@@ -529,7 +581,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		}
 
 		// Enabled in 1.6.0: per-asset svn:ignore toggle. Use Ignore Manager (Assets/SVN/Ignore Manager) for batch editing.
-		[MenuItem("Assets/SVN/\u26D4  Ignore Toggle", false, MenuItemPriorityStart + 108)]
+		[MenuItem("Window/Version Control/SVN/\u26D4  Ignore Toggle", false, WindowMenuPriority + 40)]
 		public static void IgnoreToggleSelected()
 		{
 			IgnoreToggle(GetSelectedAssetPaths().FirstOrDefault());
@@ -612,13 +664,13 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 
 
 
-		[MenuItem("Assets/SVN/\U0001F4CB  Ignore Manager", false, MenuItemPriorityStart + 109)]
+		[MenuItem("Window/Version Control/SVN/\U0001F4CB  Ignore Manager", false, WindowMenuPriority + 41)]
 		public static void ShowIgnoreManager()
 		{
 			SVNIgnoreManagerWindow.Open();
 		}
 
-		[MenuItem("Assets/SVN/\U0001F9F9  Cleanup", false, MenuItemPriorityStart + 110)]
+		[MenuItem("Window/Version Control/SVN/\U0001F9F9  Cleanup", false, WindowMenuPriority + 50)]
 		public static void Cleanup()
 		{
 			m_Integration?.Cleanup(true);

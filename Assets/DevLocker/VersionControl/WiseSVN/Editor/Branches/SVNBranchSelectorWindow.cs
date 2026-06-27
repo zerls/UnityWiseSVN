@@ -132,7 +132,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 
 		private const float ToolbarsTitleWidth = 70f;
 
-		[MenuItem("Assets/SVN/Branch Selector", false, SVNContextMenusManager.MenuItemPriorityStart + 140)]
+		[MenuItem("Window/Version Control/SVN/\U0001F4CD  Branch Selector", false, SVNContextMenusManager.WindowMenuPriority + 2)]
 		private static void OpenBranchesSelector()
 		{
 			var window = CreateInstance<SVNBranchSelectorWindow>();
