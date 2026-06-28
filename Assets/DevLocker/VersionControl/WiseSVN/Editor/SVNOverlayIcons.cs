@@ -215,11 +215,12 @@ namespace DevLocker.VersionControl.WiseSVN
 			var icon = SVNPreferencesManager.Instance.GetLockStatusIconContent(r.LockStatus);
 			if (icon == null) return;
 
-			// 无论纹理模式还是 Emoji 模式，锁图标始终作为可点击按钮
-			// Emoji 模式：GUIStyle 复用 label 样式，Emoji 文本作为按钮内容
+			// Lock icon is always drawn as emoji via DrawEmoji (same rendering path as file-status and remote).
+			// It remains clickable: MouseDown then ShowLockDetailsDialog.
 			var rect = BuildIconRect(sel, IconSlot.BottomRight);
-			if (GUI.Button(rect, icon, EditorStyles.label))
+			if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
 				ShowLockDetailsDialog(guid);
+			WiseSVNGUIUtils.DrawEmoji(rect, icon);
 		}
 
 		private static void ShowLockDetailsDialog(string guid)
@@ -251,7 +252,6 @@ namespace DevLocker.VersionControl.WiseSVN
 			if (icon.image != null) {
 				GUI.Label(BuildIconRect(sel, IconSlot.BottomLeft), icon);
 			} else {
-				// Emoji mode — icon.text contains the emoji glyph, uses DrawEmoji.
 				WiseSVNGUIUtils.DrawEmoji(BuildIconRect(sel, IconSlot.BottomLeft), icon);
 			}
 		}
