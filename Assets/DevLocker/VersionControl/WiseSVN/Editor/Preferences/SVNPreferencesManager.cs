@@ -45,6 +45,10 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			public bool PopulateIgnoresDatabase = true;    // For svn-ignored icons etc.
 			public bool ShowNormalStatusOverlayIcon = false;
 			public bool ShowExcludedStatusOverlayIcon = true;
+			// Draw a small badge on folders that are NTFS directory junctions (mklink /J).
+			// Helps the user visually distinguish junction roots from regular folders,
+			// since SVN operates against the real target path under the hood.
+			public bool ShowJunctionOverlayIcon = true;
 
 			public string SvnCLIPath = string.Empty;
 
@@ -190,6 +194,16 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		[SerializeField] private long m_ProjectPrefsLastModifiedTime = 0;
 
 		public event Action PreferencesChanged;
+
+		// Fire PreferencesChanged without persisting prefs — used by SVNOverlayIcons to
+		// "simulate a user preference toggle" after Unity startup. Empirically, the only
+		// reliable trigger that brings Unversioned overlay icons back after a fresh Unity
+		// launch is a real preference toggle; this method lets SVNOverlayIcons replay the
+		// same effect programmatically without bouncing the prefs file.
+		public void NotifyPreferencesChanged()
+		{
+			PreferencesChanged?.Invoke();
+		}
 
 		public bool NeedsToAuthenticate { get; internal set; }
 
@@ -412,6 +426,23 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			FileStatusIcons[(int)VCFileStatus.Ignored]     = TryTortoiseIcon(tortoise, iconsDir, theme, "IgnoredIcon.ico",     LocalizationManager.Tr("overlay.tooltip.ignored"))     ?? LoadTexture("SVNOverlayIcons/SVNIgnoredIcon",     LocalizationManager.Tr("overlay.tooltip.ignored"));
 			FileStatusIcons[(int)VCFileStatus.Unversioned] = TryTortoiseIcon(tortoise, iconsDir, theme, "UnversionedIcon.ico", null)                                                   ?? LoadTexture("SVNOverlayIcons/SVNUnversionedIcon");
 			FileStatusIcons[(int)VCFileStatus.Excluded]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ReadOnlyIcon.ico",    LocalizationManager.Tr("overlay.tooltip.excluded"))    ?? LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon",    LocalizationManager.Tr("overlay.tooltip.excluded"));
+			// Honest 12-state mapping (the 14 VCFileStatus values share 12 PNGs):
+			//   External    → Normal art      (svn:externals — content tracked in another repo; locally equivalent to a clean tracked file)
+			//   Obstructed  → Conflict art    (svn `~` status — wrong-type filesystem entity at a tracked path; semantically a conflict)
+			//   ReadOnly    → ReadOnlyIcon    (produced by TSVNCache when svn:needs-lock is set on a file the user does not hold a lock for)
+			//   Replaced    → Modified art    (already mapped above as a Modified alias)
+			//   Missing     → Deleted art     (already mapped above as a Deleted alias)
+			// Incomplete/Merged stay unmapped on purpose — they are not user-actionable display states.
+			FileStatusIcons[(int)VCFileStatus.External]    = TryTortoiseIcon(tortoise, iconsDir, theme, "NormalIcon.ico",      LocalizationManager.Tr("overlay.tooltip.external"))    ?? LoadTexture("SVNOverlayIcons/SVNNormalIcon",      LocalizationManager.Tr("overlay.tooltip.external"));
+			FileStatusIcons[(int)VCFileStatus.Obstructed]  = TryTortoiseIcon(tortoise, iconsDir, theme, "ConflictIcon.ico",    LocalizationManager.Tr("overlay.tooltip.obstructed"))  ?? LoadTexture("SVNOverlayIcons/SVNConflictIcon",    LocalizationManager.Tr("overlay.tooltip.obstructed"));
+			FileStatusIcons[(int)VCFileStatus.ReadOnly]    = TryTortoiseIcon(tortoise, iconsDir, theme, "ReadOnlyIcon.ico",    LocalizationManager.Tr("overlay.tooltip.readonly"))    ?? LoadTexture("SVNOverlayIcons/SVNReadOnlyIcon",    LocalizationManager.Tr("overlay.tooltip.readonly"));
+			// Incomplete / Merged are transient libsvn intermediate states (partial update in progress,
+			// merge result mid-operation). They normally vanish before any UI tick sees them, but if
+			// the user opens the Project window during an svn merge / update we still need to render
+			// something rather than silently skipping. Reuse the Conflict art — these states block
+			// further edits and the user needs to take action (finish the update or `svn cleanup`).
+			FileStatusIcons[(int)VCFileStatus.Incomplete]  = TryTortoiseIcon(tortoise, iconsDir, theme, "ConflictIcon.ico",    LocalizationManager.Tr("overlay.tooltip.incomplete"))  ?? LoadTexture("SVNOverlayIcons/SVNConflictIcon",    LocalizationManager.Tr("overlay.tooltip.incomplete"));
+			FileStatusIcons[(int)VCFileStatus.Merged]      = TryTortoiseIcon(tortoise, iconsDir, theme, "ModifiedIcon.ico",    LocalizationManager.Tr("overlay.tooltip.merged"))      ?? LoadTexture("SVNOverlayIcons/SVNModifiedIcon",    LocalizationManager.Tr("overlay.tooltip.merged"));
 
 			LockStatusIcons = new GUIContent[Enum.GetValues(typeof(VCLockStatus)).Length];
 			LockStatusIcons[(int)VCLockStatus.LockedHere]      = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.locked_here"))  ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedHereIcon",  LocalizationManager.Tr("overlay.tooltip.locked_here"));
@@ -434,7 +465,13 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				byte[] data = File.ReadAllBytes(path);
 				var tex = ExtractBestImageFromIco(data);
 				if (tex != null) {
-					tex.filterMode = FilterMode.Bilinear;
+					// Mipmaps + trilinear give clean downscale from 256×256 source art to the
+					// ~18-50px on-screen sizes we render at in the Project window grid. Without
+					// these the small zoom levels would alias the high-frequency edge into a smudge.
+					tex.filterMode = FilterMode.Trilinear;
+					tex.wrapMode   = TextureWrapMode.Clamp;
+					tex.anisoLevel = 4;
+					tex.Apply(updateMipmaps: true, makeNoLongerReadable: false);
 					return new GUIContent(tex, tooltip);
 				}
 			} catch (Exception ex) {
@@ -508,7 +545,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			if (bestPngOffset >= 0) {
 				byte[] png = new byte[bestPngSize];
 				Array.Copy(data, bestPngOffset, png, 0, bestPngSize);
-				var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+				// mipmaps=true so the 256×256 source can downscale cleanly to 18-32px without aliasing.
+				var tex = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: true, linear: true);
 				if (tex.LoadImage(png)) return tex;
 				UnityEngine.Object.DestroyImmediate(tex);
 			}
@@ -546,9 +584,10 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				}
 			}
 
-			var tex = new Texture2D(width, actualHeight, TextureFormat.RGBA32, false, true);
+			// mipmaps=true matches the PNG path — clean downscale to 18-32px on-screen.
+			var tex = new Texture2D(width, actualHeight, TextureFormat.RGBA32, mipChain: true, linear: true);
 			tex.SetPixels32(pixels);
-			tex.Apply(false, false);
+			tex.Apply(updateMipmaps: true, makeNoLongerReadable: false);
 			return tex;
 		}
 

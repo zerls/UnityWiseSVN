@@ -358,6 +358,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			m_PersonalPrefs.PopulateIgnoresDatabase = EditorGUILayout.Toggle(TrContent("prefs.scan_svn_ignores", "prefs.scan_svn_ignores.tooltip"), m_PersonalPrefs.PopulateIgnoresDatabase);
 			m_PersonalPrefs.ShowNormalStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_normal_icon", "prefs.show_normal_icon.tooltip"), m_PersonalPrefs.ShowNormalStatusOverlayIcon);
 			m_PersonalPrefs.ShowExcludedStatusOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_excluded_icon", "prefs.show_excluded_icon.tooltip"), m_PersonalPrefs.ShowExcludedStatusOverlayIcon);
+			m_PersonalPrefs.ShowJunctionOverlayIcon = EditorGUILayout.Toggle(TrContent("prefs.show_junction_icon", "prefs.show_junction_icon.tooltip"), m_PersonalPrefs.ShowJunctionOverlayIcon);
 			m_PersonalPrefs.AutoRefreshDatabaseInterval = EditorGUILayout.IntField(TrContent("prefs.refresh_interval", "prefs.refresh_interval.tooltip"), m_PersonalPrefs.AutoRefreshDatabaseInterval);
 			m_PersonalPrefs.RefreshDatabaseOnFocus = EditorGUILayout.Toggle(TrContent("prefs.refresh_on_focus", "prefs.refresh_on_focus.tooltip"), m_PersonalPrefs.RefreshDatabaseOnFocus);
 

@@ -47,10 +47,12 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 
 		// On cache miss, DON'T block the main thread with a pipe query — the Project window
 		// calls GetStatus() for every visible asset per frame, so a single cold miss would
-		// cascade into N×800ms hangs. Instead return None immediately and schedule a one-shot
-		// background refresh that populates the cache, then repaints the Project window.
-		// 200ms cooldown prevents runaway bursts during rapid scrolling.
-		private bool m_CacheMissPending;
+		// cascade into N×800ms hangs. Instead enqueue the miss and have a background worker
+		// drain the queue → fill the cache → fire StatusesChanged → repaint Project window.
+		// 100ms cooldown smooths bursts during rapid scrolling.
+		private readonly HashSet<string> m_PendingPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		private readonly object m_PendingLock = new object();
+		private bool m_FillRunning;
 		private double m_LastCacheMissTime;
 		// Pipe names — discovered at runtime because newer TortoiseSVN versions append the
 		// Windows session ID: \\.\pipe\TSVNCache_1  / \\.\pipe\TSVNCacheCommand_1.
@@ -174,13 +176,18 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		}
 
 		// ── ISVNStatusProvider ───────────────────────────────────────────────
+		// Cache timestamps use Environment.TickCount-based seconds so the background filler
+		// (which can't read EditorApplication.timeSinceStartup off the main thread) and the
+		// main-thread reader share the same monotonic clock.
+		private static double NowSeconds() => System.Environment.TickCount / 1000.0;
+
 		public SVNStatusData GetStatus(string assetPath)
 		{
 			if (string.IsNullOrEmpty(assetPath))
 				return new SVNStatusData { Status = VCFileStatus.None };
 
 			string nativePath = ToNativePath(assetPath);
-			double now = EditorApplication.timeSinceStartup;
+			double now = NowSeconds();
 
 			lock (m_CacheLock) {
 				if (m_Cache.TryGetValue(nativePath, out var entry) && now - entry.timestamp < k_CacheTTL)
@@ -188,30 +195,63 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			}
 
 			// Cache miss — don't block Unity's GUI thread with a sync pipe query.
-			// This is the Project window's per-asset path; doing sync IPC here would
-			// freeze the editor. The caller can request a background fill via EnqueueCacheMissFill().
+			// Queue this path for the background filler and return None for now.
+			// Once the worker fills it, StatusesChanged repaints the Project window
+			// and the next ItemOnGUI tick will hit the cache.
+			lock (m_PendingLock) {
+				m_PendingPaths.Add(nativePath);
+			}
 			ScheduleCacheMissFill();
 			return new SVNStatusData { Status = VCFileStatus.None };
 		}
 
 		private void ScheduleCacheMissFill()
 		{
-			double now = EditorApplication.timeSinceStartup;
-			if (m_CacheMissPending) return;
-			if (now - m_LastCacheMissTime < 0.2) return;
-			m_LastCacheMissTime = now;
-			m_CacheMissPending = true;
-			EditorApplication.delayCall += ExecuteCacheMissFill;
+			double now = NowSeconds();
+			lock (m_PendingLock) {
+				if (m_FillRunning) return;
+				if (now - m_LastCacheMissTime < 0.1) return;
+				m_LastCacheMissTime = now;
+				m_FillRunning = true;
+			}
+			System.Threading.ThreadPool.QueueUserWorkItem(_ => RunCacheMissFill());
 		}
 
-		private void ExecuteCacheMissFill()
+		// Background worker: drain m_PendingPaths through QueryPipe, fill cache, then repaint.
+		// Bounded per run (max 64 paths) so a single burst can't hog the worker thread; remaining
+		// paths get picked up on the next miss-driven schedule.
+		private void RunCacheMissFill()
 		{
-			m_CacheMissPending = false;
-			if (!m_Ready) return;
 			try {
-				// Fire StatusesChanged so the Project window repaints.
-				StatusesChanged?.Invoke();
-			} catch { /* best-effort */ }
+				const int kMaxPerRun = 64;
+				int filled = 0;
+				while (filled < kMaxPerRun) {
+					string path;
+					lock (m_PendingLock) {
+						if (m_PendingPaths.Count == 0) break;
+						var enumerator = m_PendingPaths.GetEnumerator();
+						enumerator.MoveNext();
+						path = enumerator.Current;
+						m_PendingPaths.Remove(path);
+					}
+					if (string.IsNullOrEmpty(path)) continue;
+
+					var status = QueryPipe(path);
+
+					lock (m_CacheLock) {
+						m_Cache[path] = (status, NowSeconds());
+					}
+					filled++;
+				}
+			} catch (Exception ex) {
+				Debug.LogWarning($"[WiseSVN] TSVNCache fill worker error: {ex.GetType().Name}: {ex.Message}");
+			} finally {
+				lock (m_PendingLock) {
+					m_FillRunning = false;
+				}
+				// Re-fire on the main thread so consumers can refresh the Project window.
+				EditorApplication.delayCall += () => StatusesChanged?.Invoke();
+			}
 		}
 
 		public IEnumerable<SVNStatusData> EnumerateInteresting()
@@ -466,13 +506,36 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 
 		private static SVNStatusData ToSVNStatusData(TSVNCacheResponseHeader resp, string nativePath)
 		{
-			// Use the combined m_status field — it folds text + prop into a single overall status the
-			// shell uses for the overlay icon. Fall back to textStatus if m_status is None.
-			sbyte overall = resp.status != 0 ? resp.status : resp.textStatus;
+			// Prefer textStatus (per-entry literal state) over m_status (TortoiseSVN's
+			// recursive-rollup status that bubbles parent state down).
+			//
+			// Real-world failure mode this avoids:
+			//   - You have unversioned/Foo/bar.txt inside an unversioned folder unversioned/Foo
+			//   - TortoiseSVN rolls m_status up so bar.txt's m_status reports the parent's
+			//     synthesized state, which can be Normal (3) for the project root view.
+			//   - textStatus on the same response is 2 (svn_wc_status_unversioned) — correct.
+			// Falling back to m_status only when textStatus is uninformative (0/None/9-Merged)
+			// matches what TortoiseSVN's shell extension does for individual file icons.
+			sbyte overall = resp.textStatus;
+			if (overall <= 0 || overall == 1 /*svn_wc_status_none*/ || overall == 9 /*merged*/) {
+				if (resp.status > 0) overall = resp.status;
+			}
 			VCFileStatus fileStatus = (overall >= 0 && overall < k_StatusKindMap.Length)
 				? k_StatusKindMap[overall] : VCFileStatus.None;
 			VCPropertiesStatus propStatus = (resp.propStatus >= 0 && resp.propStatus < k_PropStatusMap.Length)
 				? k_PropStatusMap[resp.propStatus] : VCPropertiesStatus.None;
+
+			// svn:needs-lock semantics: when a file has the svn:needs-lock property set AND
+			// the working copy does not currently hold a lock, TortoiseSVN's shell extension
+			// shows a "readonly / needs-lock" overlay (the same visual treatment as a generic
+			// read-only file). Mirror that here so the user has a visible signal that this is
+			// a lock-required file they cannot edit until they `svn lock` it.
+			//
+			// Only override Normal — if the file is also Modified / Added / etc., the more
+			// specific state is more useful. needsLock is essentially a clean-state decorator.
+			if (resp.needsLock && !resp.hasLockOwner && fileStatus == VCFileStatus.Normal) {
+				fileStatus = VCFileStatus.ReadOnly;
+			}
 
 			// TSVNCacheResponse doesn't expose repo / out-of-date info — that requires "check repository"
 			// which TSVNCache only does on demand. Leave RemoteStatus None; the CLI database still
