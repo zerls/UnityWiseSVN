@@ -283,13 +283,12 @@ namespace DevLocker.VersionControl.WiseSVN
 
 			if (isList) {
 				// 列表视图：Emoji 在固定 14px 尺寸下显得偏大，缩小到 60%（≈ 8.4px）
-				// 保留 BottomRight（Lock 贴图按钮）原始尺寸以保证可点击区域
 				const float emojiSize = 14f * 0.6f;
 				switch (slot) {
 					case IconSlot.TopRight:
 						return new Rect(sel.x + sel.width - sel.height * 2f, sel.y, emojiSize, emojiSize);
 					case IconSlot.BottomRight:
-						return new Rect(sel.x + sel.width - sel.height * 3f, sel.y, sel.height, sel.height);
+						return new Rect(sel.x + sel.width - sel.height * 3f, sel.y, emojiSize, emojiSize);
 					case IconSlot.BottomLeft:
 						return new Rect(sel.x, sel.y + 7f, emojiSize, emojiSize);
 					case IconSlot.TopLeft:
@@ -306,7 +305,7 @@ namespace DevLocker.VersionControl.WiseSVN
 					case IconSlot.TopRight:
 						return new Rect(sel.x + roff, sel.y - 2f, rw, rw);
 					case IconSlot.BottomRight:
-						return new Rect(sel.x + offset, sel.y + offset + 2f, w, w);
+						return new Rect(sel.x + offset, sel.y + offset + 2f, rw, rw);
 					case IconSlot.BottomLeft:
 						return new Rect(sel.x, sel.y + offset + 1f, rw, rw);
 					case IconSlot.TopLeft: {
