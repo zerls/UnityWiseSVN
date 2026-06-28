@@ -80,8 +80,8 @@ namespace DevLocker.VersionControl.WiseSVN
 
 	public enum WiseSVNIconStyle
 	{
-		Classic = 0,     // Bundled PNG overlay icons (original TortoiseSVN Classic set)
-		TortoiseSVN = 1, // Load from TortoiseOverlays installation (Windows only; falls back to Classic)
+		Emoji = 0,       // Unicode emoji glyphs — zero external resources, smallest package size
+		TortoiseSVN = 1, // Load from TortoiseOverlays installation (Windows only; falls back to Emoji)
 	}
 
 	// Maps a branch-name regex pattern to a badge color. Used by SVNStatusBadge.ResolveBranchColor;

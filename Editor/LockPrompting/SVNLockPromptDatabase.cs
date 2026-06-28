@@ -386,9 +386,9 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 				var lockPromptParam = m_ProjectPrefs.LockPromptParameters
 					.FirstOrDefault(al => WiseSVNIntegration.ArePathsNested(al.TargetFolder, assetPath));
 
-				if (lockPromptParam == null)
-					continue;
-
+				// LockPromptParameters is a value type (struct), so FirstOrDefault returns
+				// default(LockPromptParameters) where TargetFolder is null — check that instead
+				// of `== null` which does not compile on structs.
 				if (string.IsNullOrEmpty(lockPromptParam.TargetFolder))
 					continue;
 
@@ -425,9 +425,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 					var lockPromptParam = m_ProjectPrefs.LockPromptParameters
 						.FirstOrDefault(al => WiseSVNIntegration.ArePathsNested(al.TargetFolder, assetPath));
 
-					if (lockPromptParam == null)
-						continue;
-
+					// Same value-type guard as above.
 					if (string.IsNullOrEmpty(lockPromptParam.TargetFolder))
 						continue;
 

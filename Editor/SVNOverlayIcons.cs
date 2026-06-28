@@ -215,8 +215,14 @@ namespace DevLocker.VersionControl.WiseSVN
 			var icon = SVNPreferencesManager.Instance.GetLockStatusIconContent(r.LockStatus);
 			if (icon == null) return;
 
-			if (GUI.Button(BuildIconRect(sel, IconSlot.BottomRight), icon, EditorStyles.label))
-				ShowLockDetailsDialog(guid);
+			if (icon.image != null) {
+				// Texture icon — use as button (clickable for lock details)
+				if (GUI.Button(BuildIconRect(sel, IconSlot.BottomRight), icon, EditorStyles.label))
+					ShowLockDetailsDialog(guid);
+			} else {
+				// Emoji mode — display-only; no lock details dialog on emoji
+				WiseSVNGUIUtils.DrawEmoji(BuildIconRect(sel, IconSlot.BottomRight), icon);
+			}
 		}
 
 		private static void ShowLockDetailsDialog(string guid)
@@ -243,9 +249,14 @@ namespace DevLocker.VersionControl.WiseSVN
 				(fs == VCFileStatus.Excluded || fs == VCFileStatus.Ignored)) return;
 
 			var icon = SVNPreferencesManager.Instance.GetFileStatusIconContent(fs);
-			if (icon == null || icon.image == null) return;
+			if (icon == null) return;
 
-			GUI.Label(BuildIconRect(sel, IconSlot.BottomLeft), icon);
+			if (icon.image != null) {
+				GUI.Label(BuildIconRect(sel, IconSlot.BottomLeft), icon);
+			} else {
+				// Emoji mode — icon.text contains the emoji glyph, uses DrawEmoji.
+				WiseSVNGUIUtils.DrawEmoji(BuildIconRect(sel, IconSlot.BottomLeft), icon);
+			}
 		}
 
 		private static GUIContent s_JunctionBadgeContent;
@@ -274,15 +285,18 @@ namespace DevLocker.VersionControl.WiseSVN
 			bool isList = sel.width > sel.height;
 
 			if (isList) {
+				// 列表视图：Emoji 在固定 14px 尺寸下显得偏大，缩小到 60%（≈ 8.4px）
+				// 保留 BottomRight（Lock 贴图按钮）原始尺寸以保证可点击区域
+				const float emojiSize = 14f * 0.6f;
 				switch (slot) {
 					case IconSlot.TopRight:
-						return new Rect(sel.x + sel.width - sel.height * 2f, sel.y, sel.height, sel.height);
+						return new Rect(sel.x + sel.width - sel.height * 2f, sel.y, emojiSize, emojiSize);
 					case IconSlot.BottomRight:
 						return new Rect(sel.x + sel.width - sel.height * 3f, sel.y, sel.height, sel.height);
 					case IconSlot.BottomLeft:
-						return new Rect(sel.x - 3f, sel.y + 7f, 14f, 14f);
+						return new Rect(sel.x, sel.y + 7f, emojiSize, emojiSize);
 					case IconSlot.TopLeft:
-						return new Rect(sel.x, sel.y + 1f, 14f, 14f);
+						return new Rect(sel.x, sel.y + 1f, emojiSize, emojiSize);
 					default: return Rect.zero;
 				}
 			} else {
@@ -297,7 +311,7 @@ namespace DevLocker.VersionControl.WiseSVN
 					case IconSlot.BottomRight:
 						return new Rect(sel.x + offset, sel.y + offset + 2f, w, w);
 					case IconSlot.BottomLeft:
-						return new Rect(sel.x, sel.y + offset + 1f, w, w);
+						return new Rect(sel.x, sel.y + offset + 1f, rw, rw);
 					case IconSlot.TopLeft: {
 						float jw = Mathf.Max(14f, sel.width * 0.22f);
 						return new Rect(sel.x, sel.y, jw, jw);
