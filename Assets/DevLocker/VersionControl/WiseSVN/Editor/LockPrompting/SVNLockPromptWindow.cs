@@ -136,8 +136,8 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 		private void InitializeStyles()
 		{
-			m_RevertContent = SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Revert", Tr("lockprompt.revert_asset"));
-			m_DiffContent = SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Pending", Tr("lockprompt.check_changes"));
+			m_RevertContent = WiseSVNGUIUtils.LoadTexture("BranchesIcons/SVN-Revert", Tr("lockprompt.revert_asset"));
+			m_DiffContent = WiseSVNGUIUtils.LoadTexture("BranchesIcons/SVN-ConflictsScan-Pending", Tr("lockprompt.check_changes"));
 
 			// Copied from SVNBranchSelectorWindow.
 			MiniIconButtonlessStyle = new GUIStyle(GUI.skin.button);

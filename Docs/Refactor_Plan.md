@@ -1,7 +1,7 @@
 # WiseSVN 重构计划
 
-> 状态：待审批，不执行。
-> 参照基准：已完成重构的 `SVNOverlayIcons.cs`（emoji 渲染、BuildIconRect 统一布局、MergeCliStatus 分层、DrawEmoji 通用辅助）。
+> 状态：已全部执行完成（2026-06-28）。
+> 参照基准：`SVNOverlayIcons.cs`（emoji 渲染、BuildIconRect 统一布局、SVNStatusResolver 三层分离、WiseSVNGUIUtils 通用辅助）。
 
 ---
 

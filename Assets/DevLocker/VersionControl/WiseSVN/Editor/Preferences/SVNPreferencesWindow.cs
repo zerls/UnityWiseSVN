@@ -4,6 +4,7 @@ using DevLocker.VersionControl.WiseSVN.LockPrompting;
 using DevLocker.VersionControl.WiseSVN.Branches;
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
 using DevLocker.VersionControl.WiseSVN.Localization;
+using DevLocker.VersionControl.WiseSVN.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -314,11 +315,11 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				TrContent("prefs.icon_style", "prefs.icon_style.tooltip"), m_PersonalPrefs.IconStyle);
 
 			if (m_PersonalPrefs.IconStyle == WiseSVNIconStyle.TortoiseSVN) {
-				string iconsDir = SVNPreferencesManager.GetTortoiseOverlaysIconsDir();
+				string iconsDir = WiseSVNGUIUtils.GetTortoiseOverlaysIconsDir();
 				if (string.IsNullOrEmpty(iconsDir)) {
 					EditorGUILayout.HelpBox(Tr("prefs.icon_theme.not_found"), MessageType.Warning);
 				} else {
-					string[] themes = SVNPreferencesManager.GetAvailableTortoiseThemes();
+					string[] themes = WiseSVNGUIUtils.GetAvailableTortoiseThemes();
 					int idx = Array.IndexOf(themes, m_PersonalPrefs.TortoiseSVNTheme);
 					if (idx < 0) idx = Array.IndexOf(themes, "Win10");
 					if (idx < 0 && themes.Length > 0) idx = 0;

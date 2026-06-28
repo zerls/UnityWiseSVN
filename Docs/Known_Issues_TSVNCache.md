@@ -13,15 +13,34 @@ for the rendering pipeline is now:
 > **CLI database (`SVNStatusesDatabase`) is the ground truth. TSVNCache is a
 > low-latency front cache for the subset of fields it covers.**
 
+### Architecture update (Phase 0, 2026-06-28): Three-layer separation
+
+A dedicated **[SVNStatusResolver](../Assets/DevLocker/VersionControl/WiseSVN/Editor/Providers/SVNStatusResolver.cs)**
+was introduced to separate concerns:
+
+```
+Layer 1 — raw data sources
+  TSVNCacheStatusProvider  (fast, per-path IPC, TTL 5s)
+  SVNStatusesDatabase      (batch svn status every 60s)
+
+Layer 2 — SVNStatusResolver (THIS CLASS)
+  Subscribes to events from both sources.
+  Holds previous merge results during DB rebuild (suppresses flicker).
+  Merges per GUID using CLI-as-ground-truth rules.
+  Fires ResolvedChanged when cached result actually changes.
+
+Layer 3 — pure rendering
+  SVNOverlayIcons.ItemOnGUI calls GetResolved(guid) — O(1), zero data logic.
+  SVNStatusBarOverlay calls EnumerateResolved() for badge counts.
+```
+
+Previously the merge was done inline in `SVNOverlayIcons.MergeCliStatus()` on
+every frame per visible asset. Now it happens in `SVNStatusResolver` only when
+data changes, and the Project window reads pre-merged results at O(1).
+
 Concretely [SVNOverlayIcons.ItemOnGUI](../Assets/DevLocker/VersionControl/WiseSVN/Editor/SVNOverlayIcons.cs):
-
-1. Call `StatusProvider.GetStatus(path)` — fast path; TSVNCache when available
-   on Windows, CLI elsewhere.
-2. **Unconditionally** overlay `SVNStatusesDatabase.GetKnownStatusData(guid)` on
-   top, field-by-field, with CLI winning whenever it has a non-default value.
-
-The previous "merge only when Status==None or LockDetails empty" gate was
-broken in two ways:
+1. Call `SVNStatusResolver.Instance.GetResolved(guid)` — O(1) lookup of pre-merged state.
+2. Draw directly from `ResolvedStatusData` — no merge, no escalation, no file-status resolution.
 - `LockDetails.Equals(LockDetails.Empty)` was false for the CLI path (where
   LockDetails is `default(LockDetails)`, OperationResult=Unknown ≠ Success),
   so the gate accidentally worked only in TSVNCache mode and only because TSVN
