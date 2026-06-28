@@ -200,7 +200,9 @@ namespace DevLocker.VersionControl.WiseSVN.Localization
 				string assetPath = AssetDatabase.GUIDToAssetPath(guid);
 				if (!assetPath.Contains("/" + LocaleDirRelative + "/")) continue;
 				if (!assetPath.EndsWith(fileNameNoExt + ".txt", StringComparison.OrdinalIgnoreCase)) continue;
-				string full = Path.Combine(Directory.GetCurrentDirectory(), assetPath);
+				// Use Application.dataPath (project root, always stable) instead of
+				// Directory.GetCurrentDirectory() which can drift if any code changes CWD.
+				string full = Path.GetFullPath(assetPath);
 				lock (s_LockObj) {
 					s_LocalePathCache[fileNameNoExt] = full;
 				}
