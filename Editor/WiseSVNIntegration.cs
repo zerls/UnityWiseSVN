@@ -2379,10 +2379,32 @@ namespace DevLocker.VersionControl.WiseSVN
 			return str.Substring(valueStartIndex, lineEndIndex - valueStartIndex);
 		}
 
+		// Universal path funnel for every SVN command invocation.
+		//
+		// Two transformations applied here:
+		//
+		// 1. NTFS junction translation (mklink /J on Windows).
+		//    Large monorepos commonly share assets via directory junctions like:
+		//        mklink /J Assets/SharedArt D:/CompanyShared/Art
+		//    The .svn working-copy metadata lives at the real target (D:/CompanyShared/Art/.svn),
+		//    NOT under the link path. TortoiseSVN's CLI behavior on junctions varies between
+		//    versions — sometimes transparent, sometimes "E155007: not a working copy". To make
+		//    operations bulletproof regardless of the CLI's behavior, we rewrite the link path
+		//    into the real path BEFORE handing it to svn. The result is that commits, updates,
+		//    locks, and status queries against junction-mapped assets all hit the real
+		//    working-copy directory and SVN tracks them normally. See
+		//    Editor/Utils/JunctionResolver.cs for the resolver implementation.
+		//
+		// 2. Trailing '@' escape — see comment below; covers SVN's "@revision" path syntax.
 		private static string SVNFormatPath(string path)
 		{
 			if (string.IsNullOrEmpty(path))
 				return "";
+
+			// Junction translation happens FIRST so the '@' escape lands on the real path.
+			// Falls through unchanged when the resolver has no junctions registered, so cost
+			// is one HasJunctions bool check on most projects.
+			path = Utils.JunctionResolver.ToRealPath(path);
 
 			// NOTE: @ is added at the end of path, to avoid problems when file name contains @, and SVN mistakes that as "At revision" syntax".
 			//		https://stackoverflow.com/questions/757435/how-to-escape-characters-in-subversion-managed-file-names

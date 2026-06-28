@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEngine;
 
 using static DevLocker.VersionControl.WiseSVN.Localization.LocalizationManager;
 
@@ -35,6 +36,26 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 		public const int MenuItemPriorityStart = -2000;
 
 		private static SVNContextMenusBase m_Integration;
+
+		// ─────────────────────────────────────────────────────────────────────────
+		// Why menu items show only emoji glyphs (and no per-item icons):
+		//
+		// Unity DOES expose `EditorUtility.SetItemIcon(menuPath, Texture2D)` / the legacy
+		// `Menu.SetItemIcon` via reflection. They succeed at runtime — no exception, no
+		// "path not found" warning — BUT the icon never actually renders for items under
+		// "Assets/..." right-click menus. Unity's GenericMenu / context-menu render path
+		// reads the menu entry as label-text only; the icon slot only exists for the
+		// top main-menu bar (Window/, Help/, etc.) and a few editor-window-internal cases.
+		//
+		// Confirmed empirically (this code used to populate a 23-entry map and call SetItemIcon
+		// in a delayCall hook — every call succeeded, no icons drew). Reverted to keep the
+		// emoji glyph as the single visual marker in the menu path, which is the only
+		// approach Unity actually renders.
+		//
+		// If a future Unity version exposes a real icon slot for context menus, the way
+		// in would be to re-introduce a delayCall hook here that calls the reflection-based
+		// SetItemIcon for each path. Until then this is intentional, not a regression.
+		// ─────────────────────────────────────────────────────────────────────────
 
 		internal static void SetupContextType(ContextMenusClient client)
 		{
@@ -282,11 +303,6 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			SVNBranchSelectorWindow.OpenBranchesSelector();
 		}
 
-		[MenuItem(MoreTools + "\U0001F504  Refresh Icons && Locks", false, MenuItemPriorityStart + 209)]
-		public static void RefreshIconsMenu()
-		{
-			SVNOverlayIcons.InvalidateDatabaseMenu();
-		}
 
 		[MenuItem(MoreTools + "\U0001F41B  Debug/Status Provider Info", false, MenuItemPriorityStart + 210)]
 		public static void DebugStatusProviderInfoMenu()
@@ -294,23 +310,11 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			Providers.StatusProviderInfoWindow.Open();
 		}
 
-		[MenuItem(MoreTools + "\u2699  SVN Preferences", false, MenuItemPriorityStart + 211)]
-		public static void PreferencesMenu()
-		{
-			SVNPreferencesWindow.ShowProjectPreferences();
-		}
-
 		// \u2500\u2500 Window menu: only the essential commands \u2500\u2500
 		[MenuItem("Window/Version Control/SVN/\u2699  SVN Preferences", false, WindowMenuPriority + 5)]
 		public static void WindowPreferences()
 		{
 			SVNPreferencesWindow.ShowProjectPreferences();
-		}
-
-		[MenuItem("Window/Version Control/SVN/\U0001F504  Refresh Icons && Locks", false, WindowMenuPriority + 10)]
-		public static void WindowRefreshIcons()
-		{
-			SVNOverlayIcons.InvalidateDatabaseMenu();
 		}
 
 		[MenuItem("Assets/SVN/\U0001F50D  Check Changes %&c", false, MenuItemPriorityStart + 6)]
@@ -391,6 +395,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.Update(assetPaths, includeMeta, wait: false);
 		}
 
+		[MenuItem("Assets/SVN/⤵  Update", false, MenuItemPriorityStart + 21)]
 		// Update the currently selected assets in the Project window.
 		// Falls back to UpdateAll() when nothing is selected.
 		public static void UpdateSelected()
@@ -639,7 +644,7 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus
 			m_Integration?.RepoBrowser(url, wait);
 		}
 
-		[MenuItem("Assets/SVN/\U0001F4CD  Switch Branch", false, MenuItemPriorityStart + 105)]
+		[MenuItem(MoreTools +"\U0001F4CD  Switch Branch", false, MenuItemPriorityStart + 105)]
 		public static void SwitchAll()
 		{
 			Switch(WiseSVNIntegration.GetWorkingCopyRootPath(), WiseSVNIntegration.GetWorkingCopyRootURL(), wait: true);

@@ -448,6 +448,11 @@ namespace DevLocker.VersionControl.WiseSVN
 			SVNPreferencesManager.Instance.StatusProviderChanged          += OnProviderUpgraded;
 			SVNPreferencesManager.Instance.PreferencesChanged             += OnPrefsChanged;
 			SVNStatusBadge.TooltipChanged                                 += RefreshTooltip;
+			// Even in TSVNCache mode, the CLI database still scans in the background and is
+			// the only source for some fields (out-of-date, lock owner). Listen to it directly
+			// so the toolbar badge / tooltip refresh when CLI lands new data.
+			SVNStatusesDatabase.Instance.DatabaseChanged -= OnDatabaseChanged;
+			SVNStatusesDatabase.Instance.DatabaseChanged += OnDatabaseChanged;
 			EditorApplication.delayCall += TryInject;
 		}
 

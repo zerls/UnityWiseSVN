@@ -81,18 +81,81 @@ namespace DevLocker.VersionControl.WiseSVN
 		public override double RefreshInterval => m_PersonalPrefs.AutoRefreshDatabaseInterval;
 
 		// Any assets contained in these folders are considered unversioned.
-		private volatile string[] m_UnversionedFolders = new string[0];
+		//
+		// Written from the background gather thread (line ~328), read from main-thread
+		// ItemOnGUI via GetKnownStatusData. We rely on .NET's atomic-reference-write
+		// guarantee (reference assignment is atomic on Unity's supported platforms) for
+		// the cross-thread visibility — no `volatile` needed. (Earlier code had `volatile`
+		// but Unity's serializer ignores volatile fields, which is why these arrays were
+		// resetting to empty on every assembly reload even with [SerializeField] applied.)
+		//
+		// [SerializeField]: across Unity assembly reload these are the ONLY source of
+		// Unversioned/Ignored synthesis for paths that don't have an entry in m_Data
+		// (svn status only emits non-Normal entries, so untracked files outside m_Data
+		// rely on these folder-prefix lists). Without serialization they reset to empty
+		// on every reload and the user sees no Unversioned icons until they toggle a
+		// preference, which triggers InvalidateDatabase and a rescan.
+		[SerializeField] private string[] m_UnversionedFolders = new string[0];
 
 		// Nested SVN repositories (that have ".svn" in them). NOTE: These are not external, just check-out inside check-out.
 		public IReadOnlyCollection<string> NestedRepositories => Array.AsReadOnly(m_NestedRepositories);
-		private volatile string[] m_NestedRepositories = new string[0];
+		[SerializeField] private string[] m_NestedRepositories = new string[0];
 
-		// SVN-Ignored files and folders.
-		private volatile string[] m_IgnoredEntries = new string[0];
+		// SVN-Ignored files and folders. Same reload-survival rationale as m_UnversionedFolders.
+		[SerializeField] private string[] m_IgnoredEntries = new string[0];
 		// SVN-Global-ignored entries are stored separately as they are checked only once, because they are much slower.
-		private volatile string[] m_GlobalIgnoredEntries = new string[0];
+		[SerializeField] private string[] m_GlobalIgnoredEntries = new string[0];
 
-		public volatile bool m_GlobalIgnoresCollected = false;
+		// Serialized alongside m_GlobalIgnoredEntries — if the entries survive reload, the
+		// flag that says "we already collected them" must survive too, otherwise the next
+		// post-reload gather will re-run the expensive global-ignores collection and (worse)
+		// race-overwrite the still-valid serialized array with a partial scan.
+		// Plain bool, not volatile — Unity ignores volatile when serializing, and bool reads
+		// are atomic in .NET anyway; the previous read happens before the next gather thread
+		// starts, so no memory barrier is needed.
+		[SerializeField] public bool m_GlobalIgnoresCollected = false;
+
+		// ─────────────────────────────────────────────────────────────────────────
+		// guid → m_Data index accelerator.
+		//
+		// Why: with the parent class's m_Data as a List<GuidStatusDatasBind>, every
+		// GetKnownStatusData / SetStatusData / RemoveStatusData call does a linear scan.
+		// On a 80GB monorepo with the raised SanityStatusesLimit (4000) and 50 visible
+		// Project window entries per frame, that's 50 × 4000 = 200k string comparisons
+		// per frame — measurable on the main thread. With the accelerator each lookup
+		// is one Dictionary hash + compare.
+		//
+		// We keep the List (required for [SerializeField] persistence + base-class APIs)
+		// and add a transient Dictionary accelerator built lazily on first read after
+		// the data changes. Rebuilds are cheap (O(N) one-shot) and happen at most once
+		// per InvalidateDatabase / SetStatusData / RemoveStatusData cycle.
+		//
+		// NOT [SerializeField] — rebuilt from m_Data on demand. NonSerialized so Unity's
+		// serializer doesn't try to roundtrip a Dictionary (which it can't).
+		[NonSerialized] private Dictionary<string, int> m_GuidIndex;
+		[NonSerialized] private bool m_GuidIndexDirty = true;
+
+		// Mark the accelerator stale. Called from every site that mutates m_Data.
+		private void InvalidateGuidIndex() => m_GuidIndexDirty = true;
+
+		// Build (or rebuild) the guid→index lookup. Cheap O(N) — runs at most once after
+		// each batch of mutations. Indices are List positions, NOT struct refs, because
+		// the entries themselves are mutated in place via GuidStatusDatasBind reference type.
+		private Dictionary<string, int> GetGuidIndex()
+		{
+			if (m_GuidIndex == null) {
+				m_GuidIndex = new Dictionary<string, int>(m_Data.Count, StringComparer.Ordinal);
+			}
+			if (m_GuidIndexDirty) {
+				m_GuidIndex.Clear();
+				for (int i = 0; i < m_Data.Count; i++) {
+					var k = m_Data[i].Key;
+					if (!string.IsNullOrEmpty(k)) m_GuidIndex[k] = i;
+				}
+				m_GuidIndexDirty = false;
+			}
+			return m_GuidIndex;
+		}
 
 		/// <summary>
 		/// The collected statuses are not complete due to some reason (for example, they were too many).
@@ -148,6 +211,9 @@ namespace DevLocker.VersionControl.WiseSVN
 		protected override void RefreshActive()
 		{
 			base.RefreshActive();
+			// base.RefreshActive() may have cleared m_Data when transitioning to !IsActive.
+			// Drop the guid index in lockstep so it doesn't return stale indices.
+			InvalidateGuidIndex();
 
 			if (!IsActive) {
 				DataIsIncomplete = false;
@@ -167,9 +233,25 @@ namespace DevLocker.VersionControl.WiseSVN
 		//
 		#region Populate Data
 
-		private const int SanityStatusesLimit = 600;
-		private const int SanityUnversionedFoldersLimit = 250;
-		private const int SanityIgnoresLimit = 250;
+		// Sanity caps to keep memory + ItemOnGUI cost bounded.
+		//
+		// Originally 600 / 250 / 250 — adequate for typical small/medium projects but
+		// too conservative for the 80GB monorepo regime we now target. The cost driver
+		// is m_UnversionedFolders / m_IgnoredEntries prefix-match scans per visible
+		// Project window entry per frame. With strings averaging 64 chars, even at 2000
+		// folders each match is ~50ns × 2000 = 100µs / call; 50 visible entries = 5ms/
+		// frame, still under a third of a 60Hz frame.
+		//
+		// SanityStatusesLimit doesn't materially impact ItemOnGUI (it's O(1) via the
+		// guid index), only memory + serialization cost. 4000 entries × ~256 bytes per
+		// GuidStatusDatasBind ≈ 1MB. Acceptable.
+		//
+		// DataIsIncomplete still triggers if we overflow these — telling the user the
+		// working copy is too noisy to fully reflect. Raising the bar pushes that
+		// warning rarer for big-project setups.
+		private const int SanityStatusesLimit = 4000;
+		private const int SanityUnversionedFoldersLimit = 2000;
+		private const int SanityIgnoresLimit = 2000;
 
 		protected override void StartDatabaseUpdate()
 		{
@@ -205,6 +287,16 @@ namespace DevLocker.VersionControl.WiseSVN
 				// Instead of asking twice, do it once for everything and filter by path.
 				GatherStatusDataInThreadRecursive("", statuses, unversionedFolders, nestedRepositories, reporter);
 				statuses.RemoveAll(s => !s.Path.StartsWith("Assets/") && !s.Path.StartsWith("Packages/"));
+
+				// NTFS junctions (mklink /J) — svn status against the project root won't
+				// descend into reparse points, so files reachable only through junctions
+				// are missing from the scan. Run a separate svn status against each
+				// junction's real working-copy path, then translate the output paths back
+				// to the asset-relative junction path so AssetDatabase.AssetPathToGUID
+				// keys line up. See Utils/JunctionResolver.cs for the prefix table.
+				if (Utils.JunctionResolver.HasJunctions) {
+					GatherJunctionStatusesInThread(statuses, unversionedFolders, reporter);
+				}
 
 				var slashes = new char[] { '/', '\\' };
 
@@ -391,6 +483,61 @@ namespace DevLocker.VersionControl.WiseSVN
 			}
 		}
 
+		// Scans each NTFS junction (mklink /J) under the project as an independent SVN
+		// working copy.
+		//
+		// Why this is a separate pass:
+		//   `svn status` against the project root doesn't descend into reparse points
+		//   (TortoiseSVN docs: "junctions are treated as the boundary of a working copy").
+		//   Without an explicit per-junction scan, files reachable only via junctions
+		//   are invisible to the Project window overlay icons and to the project-wide
+		//   modified-count badge.
+		//
+		// Implementation notes:
+		//   * Status results come back with paths relative to the SVN command's cwd
+		//     (i.e. the real junction target). We rewrite them to asset paths so
+		//     downstream consumers (AssetDatabase.AssetPathToGUID, m_UnversionedFolders
+		//     prefix-match) keep working unchanged.
+		//   * SVNFormatPath already translates link → real for us at the command level
+		//     (see WiseSVNIntegration.SVNFormatPath); the work here is purely the
+		//     REVERSE translation on output.
+		//   * We re-use the same GatherStatusDataInThreadRecursive routine by passing
+		//     the junction's asset-relative root as repositoryPath; the funnel handles
+		//     translation under the hood, then we post-process to fix any output paths
+		//     that came back in real-path form instead of asset-path form.
+		private void GatherJunctionStatusesInThread(List<SVNStatusData> foundStatuses, List<string> foundUnversionedFolders, IShellMonitor shellMonitor)
+		{
+			// Use the public asset-path snapshot from JunctionResolver — we walk every link
+			// root it knows about. The resolver scan is debounced; calling here is cheap.
+			foreach (var linkRoot in Utils.JunctionResolver.EnumerateJunctionRoots()) {
+				// Snapshot count so any new entries from this scan that come back with
+				// real-FS paths get translated to asset-paths below.
+				int sliceStart = foundStatuses.Count;
+				int unversionedSliceStart = foundUnversionedFolders.Count;
+
+				try {
+					GatherStatusDataInThreadRecursive(linkRoot, foundStatuses, foundUnversionedFolders, new List<string>(), shellMonitor);
+				} catch (System.Exception ex) {
+					if (DoTraceLogs) {
+						Debug.LogWarning($"[WiseSVN] Junction scan failed for {linkRoot}: {ex.GetType().Name}: {ex.Message}");
+					}
+					continue;
+				}
+
+				// Translate any output paths that came back as the REAL filesystem path
+				// (some SVN versions emit absolute paths when invoked against a junction
+				// target). Idempotent on paths that are already asset-relative.
+				for (int i = sliceStart; i < foundStatuses.Count; i++) {
+					var s = foundStatuses[i];
+					s.Path = Utils.JunctionResolver.ToAssetPath(s.Path);
+					foundStatuses[i] = s;
+				}
+				for (int i = unversionedSliceStart; i < foundUnversionedFolders.Count; i++) {
+					foundUnversionedFolders[i] = Utils.JunctionResolver.ToAssetPath(foundUnversionedFolders[i]);
+				}
+			}
+		}
+
 		private void GatherIgnoresInThread(string repositoryPath, List<string> foundIgnoredEntries, IShellMonitor shellMonitor)
 		{
 			var propgets = new List<PropgetEntry>();
@@ -499,6 +646,11 @@ namespace DevLocker.VersionControl.WiseSVN
 
 		protected override void WaitAndFinishDatabaseUpdate(GuidStatusDatasBind[] pendingData)
 		{
+			// The base class cleared m_Data before calling us. The guid index accelerator must
+			// follow — mark dirty so the first read after this batch rebuilds against the new
+			// rows that SetStatusData is about to add. Done at entry so any early-return paths
+			// below leave the accelerator in a consistent state.
+			InvalidateGuidIndex();
 			// Handle error here, to avoid multi-threaded issues.
 			if (LastError != StatusOperationResult.Success) {
 
@@ -580,11 +732,28 @@ namespace DevLocker.VersionControl.WiseSVN
 		private void AddModifiedFolders(SVNStatusData statusData)
 		{
 			var status = statusData.Status;
-			if (status == VCFileStatus.Unversioned || status == VCFileStatus.Ignored || status == VCFileStatus.Normal || status == VCFileStatus.Excluded || status == VCFileStatus.External || status == VCFileStatus.ReadOnly)
-				return;
+			// Early-return on clean leaves UNLESS they have remote out-of-date data — in that case
+			// we still want to propagate a remote-only signal up the folder tree so the user sees
+			// "this folder contains files newer on the server" without having to drill in.
+			// (Without this, a Normal-on-disk file with RemoteStatus=Modified gives the user no
+			// folder-level signal that an svn update would do something here.)
+			bool remoteOnly = false;
+			if (status == VCFileStatus.Unversioned || status == VCFileStatus.Ignored || status == VCFileStatus.Normal || status == VCFileStatus.Excluded || status == VCFileStatus.External || status == VCFileStatus.ReadOnly) {
+				if (statusData.RemoteStatus != VCRemoteFileStatus.None) {
+					remoteOnly = true;
+				} else {
+					return;
+				}
+			}
 
 			if (statusData.IsConflicted) {
 				statusData.Status = VCFileStatus.Conflicted;
+			} else if (remoteOnly) {
+				// Keep folder status Normal — render layer will pick the Remote icon (top-right)
+				// rather than the Modified icon (bottom-left). The whole point of this branch is
+				// to tell the user "remote has new changes" *without* falsely claiming local
+				// modifications.
+				statusData.Status = VCFileStatus.Normal;
 			} else if (status != VCFileStatus.Modified) {
 				statusData.Status = VCFileStatus.Modified;
 			}
@@ -671,7 +840,11 @@ namespace DevLocker.VersionControl.WiseSVN
 
 				if (statusData.Status == VCFileStatus.Normal) {
 
-					var knownStatusBind = m_Data.FirstOrDefault(b => b.Key == guid) ?? new GuidStatusDatasBind();
+					// O(1) lookup via guid index instead of FirstOrDefault linear scan.
+					var pIdx = GetGuidIndex();
+					GuidStatusDatasBind knownStatusBind = pIdx.TryGetValue(guid, out int kPos)
+						? m_Data[kPos]
+						: new GuidStatusDatasBind();
 					var knownMergedData = knownStatusBind.MergedStatusData;
 
 					// Check if just switched to normal from something else.
@@ -749,9 +922,11 @@ namespace DevLocker.VersionControl.WiseSVN
 				return new SVNStatusData() { Status = VCFileStatus.None };
 			}
 
-			foreach (var bind in m_Data) {
-				if (bind.Key.Equals(guid, StringComparison.Ordinal))
-					return bind.MergedStatusData;
+			// O(1) lookup via guid index (was O(N) linear scan over m_Data — hot path called
+			// per visible Project window entry per frame).
+			var idx = GetGuidIndex();
+			if (idx.TryGetValue(guid, out int dataPos)) {
+				return m_Data[dataPos].MergedStatusData;
 			}
 
 			string path = null;
@@ -829,61 +1004,64 @@ namespace DevLocker.VersionControl.WiseSVN
 				return false;
 			}
 
-			foreach (var bind in m_Data) {
-				if (bind.Key.Equals(guid, StringComparison.Ordinal)) {
+			// O(1) lookup via guid index. Was a linear `foreach var bind in m_Data` scan —
+			// fine at <100 entries, but pathological at SanityStatusesLimit (600) on hot
+			// PostProcessAssets paths where this can be called per imported asset.
+			var idx = GetGuidIndex();
+			if (idx.TryGetValue(guid, out int existingPos)) {
+				var bind = m_Data[existingPos];
 
-					if (!isMeta && bind.AssetStatusData.EqualStatuses(statusData, !compareOnlineStatuses))
-						return false;
+				if (!isMeta && bind.AssetStatusData.EqualStatuses(statusData, !compareOnlineStatuses))
+					return false;
 
-					if (isMeta && bind.MetaStatusData.EqualStatuses(statusData, !compareOnlineStatuses))
-						return false;
+				if (isMeta && bind.MetaStatusData.EqualStatuses(statusData, !compareOnlineStatuses))
+					return false;
 
-					if (!isMeta) {
-						bind.AssetStatusData = statusData;
-					} else {
-						bind.MetaStatusData = statusData;
-					}
-
-					// This is needed because the status of the meta might differ. In that case take the stronger status.
-					if (!skipPriorityCheck) {
-						if (m_StatusPriority[bind.MergedStatusData.Status] > m_StatusPriority[statusData.Status]) {
-							// Merge any other data.
-							if (bind.MergedStatusData.PropertiesStatus == VCPropertiesStatus.Normal) {
-								bind.MergedStatusData.PropertiesStatus = statusData.PropertiesStatus;
-							}
-							if (bind.MergedStatusData.TreeConflictStatus == VCTreeConflictStatus.Normal) {
-								bind.MergedStatusData.TreeConflictStatus = statusData.TreeConflictStatus;
-							}
-							if (bind.MergedStatusData.SwitchedExternalStatus == VCSwitchedExternal.Normal) {
-								bind.MergedStatusData.SwitchedExternalStatus = statusData.SwitchedExternalStatus;
-							}
-							if (bind.MergedStatusData.LockStatus == VCLockStatus.NoLock) {
-								bind.MergedStatusData.LockStatus = statusData.LockStatus;
-								bind.MergedStatusData.LockDetails = statusData.LockDetails;
-							}
-							if (bind.MergedStatusData.RemoteStatus == VCRemoteFileStatus.None) {
-								bind.MergedStatusData.RemoteStatus= statusData.RemoteStatus;
-							}
-
-							return false;
-						}
-					}
-
-					// Merged should always display lock and remote status.
-					if (statusData.LockStatus == VCLockStatus.NoLock) {
-						statusData.LockStatus = bind.MergedStatusData.LockStatus;
-						statusData.LockDetails = bind.MergedStatusData.LockDetails;
-					}
-					if (statusData.RemoteStatus == VCRemoteFileStatus.None) {
-						statusData.RemoteStatus= bind.MergedStatusData.RemoteStatus;
-					}
-
-					bind.MergedStatusData = statusData;
-					if (isMeta) {
-						bind.MergedStatusData.Path = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
-					}
-					return true;
+				if (!isMeta) {
+					bind.AssetStatusData = statusData;
+				} else {
+					bind.MetaStatusData = statusData;
 				}
+
+				// This is needed because the status of the meta might differ. In that case take the stronger status.
+				if (!skipPriorityCheck) {
+					if (m_StatusPriority[bind.MergedStatusData.Status] > m_StatusPriority[statusData.Status]) {
+						// Merge any other data.
+						if (bind.MergedStatusData.PropertiesStatus == VCPropertiesStatus.Normal) {
+							bind.MergedStatusData.PropertiesStatus = statusData.PropertiesStatus;
+						}
+						if (bind.MergedStatusData.TreeConflictStatus == VCTreeConflictStatus.Normal) {
+							bind.MergedStatusData.TreeConflictStatus = statusData.TreeConflictStatus;
+						}
+						if (bind.MergedStatusData.SwitchedExternalStatus == VCSwitchedExternal.Normal) {
+							bind.MergedStatusData.SwitchedExternalStatus = statusData.SwitchedExternalStatus;
+						}
+						if (bind.MergedStatusData.LockStatus == VCLockStatus.NoLock) {
+							bind.MergedStatusData.LockStatus = statusData.LockStatus;
+							bind.MergedStatusData.LockDetails = statusData.LockDetails;
+						}
+						if (bind.MergedStatusData.RemoteStatus == VCRemoteFileStatus.None) {
+							bind.MergedStatusData.RemoteStatus= statusData.RemoteStatus;
+						}
+
+						return false;
+					}
+				}
+
+				// Merged should always display lock and remote status.
+				if (statusData.LockStatus == VCLockStatus.NoLock) {
+					statusData.LockStatus = bind.MergedStatusData.LockStatus;
+					statusData.LockDetails = bind.MergedStatusData.LockDetails;
+				}
+				if (statusData.RemoteStatus == VCRemoteFileStatus.None) {
+					statusData.RemoteStatus= bind.MergedStatusData.RemoteStatus;
+				}
+
+				bind.MergedStatusData = statusData;
+				if (isMeta) {
+					bind.MergedStatusData.Path = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
+				}
+				return true;
 			}
 
 			m_Data.Add(new GuidStatusDatasBind() {
@@ -898,6 +1076,9 @@ namespace DevLocker.VersionControl.WiseSVN
 				m_Data.Last().MergedStatusData.Path = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
 			}
 
+			// Patch the index incrementally — no full rebuild needed for a single insert.
+			GetGuidIndex()[guid] = m_Data.Count - 1;
+
 			return true;
 		}
 
@@ -908,11 +1089,15 @@ namespace DevLocker.VersionControl.WiseSVN
 				Debug.LogError($"Trying to remove empty guid");
 			}
 
-			for(int i = 0; i < m_Data.Count; ++i) {
-				if (m_Data[i].Key.Equals(guid, StringComparison.Ordinal)) {
-					m_Data.RemoveAt(i);
-					return true;
-				}
+			// O(1) lookup; List.RemoveAt is still O(N) for the shift, but unavoidable without
+			// switching to a swap-remove which would break callers iterating m_Data in order.
+			var idx = GetGuidIndex();
+			if (idx.TryGetValue(guid, out int pos)) {
+				m_Data.RemoveAt(pos);
+				// Removing in the middle invalidates every index >= pos in the dictionary —
+				// cheapest to mark the whole accelerator dirty for next-read rebuild.
+				InvalidateGuidIndex();
+				return true;
 			}
 
 			return false;
