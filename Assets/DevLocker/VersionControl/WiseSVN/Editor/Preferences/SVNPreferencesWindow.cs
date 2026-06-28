@@ -328,9 +328,6 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 				}
 			}
 
-			m_PersonalPrefs.MenuIconStyle = (WiseSVNMenuIconStyle) EditorGUILayout.EnumPopup(
-				TrContent("prefs.menu_icon_style", "prefs.menu_icon_style.tooltip"), m_PersonalPrefs.MenuIconStyle);
-
 			EditorGUILayout.Space(4);
 			EditorGUILayout.LabelField(TrContent("prefs.statusbar_header", "prefs.statusbar_header.tooltip"), EditorStyles.boldLabel);
 			m_PersonalPrefs.ShowSVNStatusToolbar  = EditorGUILayout.Toggle(TrContent("prefs.statusbar_toolbar",  "prefs.statusbar_toolbar.tooltip"),  m_PersonalPrefs.ShowSVNStatusToolbar);

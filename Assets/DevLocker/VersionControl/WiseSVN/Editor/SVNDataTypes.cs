@@ -84,14 +84,6 @@ namespace DevLocker.VersionControl.WiseSVN
 		TortoiseSVN = 1, // Load from TortoiseOverlays installation (Windows only; falls back to Classic)
 	}
 
-	// Menu icon presentation style for the "Assets/SVN/" context menu header.
-	public enum WiseSVNMenuIconStyle
-	{
-		Default = 0,  // Load from TortoiseSVN installation when available (Windows); fall back to built-in PNG
-		Clean  = 1,   // Unity built-in icons only — no external filesystem reads
-		Emoji  = 2,   // Unicode emoji prefix in the menu path (current behavior) — zero dependencies
-	}
-
 	// Maps a branch-name regex pattern to a badge color. Used by SVNStatusBadge.ResolveBranchColor;
 	// rules are evaluated in list order, first match wins. Patterns are matched case-insensitively.
 	[Serializable]

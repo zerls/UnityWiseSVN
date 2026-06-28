@@ -53,14 +53,32 @@ namespace DevLocker.VersionControl.WiseSVN.ContextMenus.Implementation
 			// Because svn doesn't like it when you pass ignored files to some operations, like commit.
 			string paths = "";
 			if (WiseSVNIntegration.GetStatus(assetPath).Status != VCFileStatus.Ignored) {
-				paths = PreparePathArg(assetPath);
+				paths = PreparePathArg(ResolveContextPath(assetPath));
 			}
 
 			if (includeMeta && WiseSVNIntegration.GetStatus(assetPath + ".meta").Status != VCFileStatus.Ignored) {
-				paths += FileArgumentsSeparator + PreparePathArg(assetPath + ".meta");
+				paths += FileArgumentsSeparator + PreparePathArg(ResolveContextPath(assetPath + ".meta"));
 			}
 
 			return paths;
+		}
+
+		// Resolve the final path to pass to the external SVN client (TortoiseProc.exe, SnailSVN, etc.).
+		//
+		// NTFS junction translation: when the path is under a directory junction (mklink /J),
+		// the external client receives the LINK path (e.g. F:\...\Assets\MkLink-Test_\file.txt)
+		// and tries to run svn on it. But .svn metadata lives at the REAL target, so svn says
+		// "no versioned parent directory". JunctionResolver.ToRealPath translates the asset-relative
+		// link path into the real absolute path — exactly what TortoiseProc.exe needs.
+		// Falls through unchanged (still relative) when no junction matches.
+		private static string ResolveContextPath(string assetPath)
+		{
+			if (Utils.JunctionResolver.HasJunctions) {
+				string realPath = Utils.JunctionResolver.ToRealPath(assetPath);
+				if (!ReferenceEquals(realPath, assetPath))
+					return realPath;
+			}
+			return assetPath;
 		}
 
 		private string PreparePathArg(string path)

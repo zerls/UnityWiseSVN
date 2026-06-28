@@ -28,7 +28,6 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		// Icons are stored in the database so we don't reload them every time.
 		[SerializeField] private GUIContent[] FileStatusIcons = new GUIContent[0];
 		[SerializeField] private GUIContent[] LockStatusIcons = new GUIContent[0];
-		[SerializeField] private GUIContent RemoteStatusIcons = null;
 
 		[SerializeField] private bool m_RetryTextures = false;
 
@@ -69,7 +68,6 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			public WiseSVNIconStyle IconStyle = WiseSVNIconStyle.Classic;
 			public string TortoiseSVNTheme = "Win10";
-			public WiseSVNMenuIconStyle MenuIconStyle = WiseSVNMenuIconStyle.Default;
 
 			// Status badge display locations (each independently toggled).
 			public bool ShowSVNStatusToolbar  = true;   // Unity main toolbar (top bar)
@@ -202,6 +200,14 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		// same effect programmatically without bouncing the prefs file.
 		public void NotifyPreferencesChanged()
 		{
+			// LoadTextures is normally called from SavePreferences, which is what fires
+			// PreferencesChanged in real user-interaction paths. The startup resimulation
+			// in SVNOverlayIcons bypasses SavePreferences, so FileStatusIcons / LockStatusIcons
+			// may be stale (null images after assembly reload). Call LoadTextures here so
+			// the first few startup repaints see valid textures.
+			if (FileStatusIcons.Length == 0 || FileStatusIcons[(int)VCFileStatus.Modified]?.image == null) {
+				LoadTextures();
+			}
 			PreferencesChanged?.Invoke();
 		}
 
@@ -373,11 +379,6 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			return LockStatusIcons[(int)status];
 		}
 
-		public GUIContent GetRemoteStatusIconContent(VCRemoteFileStatus status)
-		{
-			return status == VCRemoteFileStatus.Modified ? RemoteStatusIcons : null;
-		}
-
 		private void LoadPreferences()
 		{
 			if (File.Exists(PERSONAL_PREFERENCES_PATH)) {
@@ -449,9 +450,6 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 			LockStatusIcons[(int)VCLockStatus.BrokenLock]      = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.broken_lock"))  ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.broken_lock"));
 			LockStatusIcons[(int)VCLockStatus.LockedOther]     = TryTortoiseIcon(tortoise, iconsDir, theme, "ReadOnlyIcon.ico",LocalizationManager.Tr("overlay.tooltip.locked_other")) ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_other"));
 			LockStatusIcons[(int)VCLockStatus.LockedButStolen] = TryTortoiseIcon(tortoise, iconsDir, theme, "LockedIcon.ico",  LocalizationManager.Tr("overlay.tooltip.locked_stolen")) ?? LoadTexture("SVNOverlayIcons/Locks/SVNLockedOtherIcon", LocalizationManager.Tr("overlay.tooltip.locked_stolen"));
-
-			// TortoiseOverlays has no remote-changes icon; always use the bundled PNG.
-			RemoteStatusIcons = LoadTexture("SVNOverlayIcons/Others/SVNRemoteChangesIcon", LocalizationManager.Tr("overlay.tooltip.remote_changes"));
 		}
 
 		// Returns a GUIContent loaded from TortoiseOverlays, or null if unavailable (falls back to Classic).
