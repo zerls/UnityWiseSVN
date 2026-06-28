@@ -5,6 +5,7 @@
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
 using DevLocker.VersionControl.WiseSVN.Localization;
 using DevLocker.VersionControl.WiseSVN.Preferences;
+using DevLocker.VersionControl.WiseSVN.Providers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -71,16 +72,24 @@ namespace DevLocker.VersionControl.WiseSVN
 			}
 		}
 
-		// Larger variant of BadgeStyle for the SceneView label. Returns a fresh style each call
-		// (font size varies with prefs; cheap to allocate per OnSceneGUI tick).
-		internal static GUIStyle MakeSceneViewBadgeStyle(int fontSize)
+		// SceneView badge style -- cached so we don't allocate a new GUIStyle
+		// per OnSceneGUI tick (the old MakeSceneViewBadgeStyle was called every frame).
+		// Cleared from PreferencesChanged when font size changes.
+		private static GUIStyle s_SceneViewBadgeStyle;
+		private static int s_SceneViewBadgeFontSize;
+
+		internal static GUIStyle GetSceneViewBadgeStyle(int fontSize)
 		{
-			return new GUIStyle(EditorStyles.boldLabel) {
-				normal    = { textColor = Color.white, background = null },
-				fontSize  = fontSize,
-				alignment = TextAnchor.MiddleCenter,
-				padding   = new RectOffset(10, 10, 4, 4),
-			};
+			if (s_SceneViewBadgeStyle == null || s_SceneViewBadgeFontSize != fontSize) {
+				s_SceneViewBadgeStyle = new GUIStyle(EditorStyles.boldLabel) {
+					normal    = { textColor = Color.white, background = null },
+					fontSize  = fontSize,
+					alignment = TextAnchor.MiddleCenter,
+					padding   = new RectOffset(10, 10, 4, 4),
+				};
+				s_SceneViewBadgeFontSize = fontSize;
+			}
+			return s_SceneViewBadgeStyle;
 		}
 
 		// Resolves a branch name to its configured color using regex rules.
@@ -126,22 +135,20 @@ namespace DevLocker.VersionControl.WiseSVN
 				branch, modified, remote, conflict ? yes : no);
 		}
 
-		// Returns (modified, remote, hasConflict). Counts come from the active status provider.
+		// Returns (modified, remote, hasConflict). Counted from the resolved data layer,
+		// not from the raw provider -- ensures consistency with overlay icons.
 		internal static (int modified, int remote, bool conflict) CountStatuses()
 		{
-			var provider = SVNPreferencesManager.Instance.StatusProvider;
-			if (!provider.IsReady) return (0, 0, false);
-
 			int modified = 0, remote = 0;
 			bool conflict = false;
-			foreach (var s in provider.EnumerateInteresting()) {
-				if (s.Status == VCFileStatus.Conflicted)  { conflict = true; modified++; continue; }
-				if (s.Status != VCFileStatus.Normal
-				 && s.Status != VCFileStatus.Excluded
-				 && s.Status != VCFileStatus.Ignored
-				 && s.Status != VCFileStatus.None)
+			foreach (var r in SVNStatusResolver.Instance.EnumerateResolved()) {
+				if (r.FileStatus == VCFileStatus.Conflicted) { conflict = true; modified++; continue; }
+				if (r.FileStatus != VCFileStatus.Normal
+				 && r.FileStatus != VCFileStatus.Excluded
+				 && r.FileStatus != VCFileStatus.Ignored
+				 && r.FileStatus != VCFileStatus.None)
 					modified++;
-				if (s.RemoteStatus != VCRemoteFileStatus.None) remote++;
+				if (r.RemoteStatus != VCRemoteFileStatus.None) remote++;
 			}
 			return (modified, remote, conflict);
 		}
@@ -672,7 +679,7 @@ namespace DevLocker.VersionControl.WiseSVN
 			bg.a = Mathf.Clamp01(prefs.SceneViewBranchAlpha);
 
 			int fontSize = Mathf.Clamp(prefs.SceneViewBranchFontSize, 8, 64);
-			var style = SVNStatusBadge.MakeSceneViewBadgeStyle(fontSize);
+			var style = SVNStatusBadge.GetSceneViewBadgeStyle(fontSize);
 
 			string label   = $"⎇ {name}";
 			var   content  = new GUIContent(label);

@@ -1,6 +1,7 @@
 // MIT License Copyright(c) 2022 Filip Slavov, https://github.com/NibbleByte/UnityWiseSVN
 
 using DevLocker.VersionControl.WiseSVN.Preferences;
+using DevLocker.VersionControl.WiseSVN.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -160,7 +161,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 				bool match = false;
 
-#if UNITY_2018_1_OR_NEWER
+	#if UNITY_2018_1_OR_NEWER
 				var prefabType = PrefabUtility.GetPrefabAssetType(go);
 
 				if (assetTypeMask.HasFlag(AssetType.Prefab))
@@ -168,14 +169,14 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 				if (assetTypeMask.HasFlag(AssetType.Model))
 					match |= prefabType == PrefabAssetType.Model;
-#else
+	#else
 				var prefabType = PrefabUtility.GetPrefabType(go);
 				if (assetTypeMask.HasFlag(AssetType.Prefab))
 					match |= prefabType == PrefabType.Prefab;
 
 				if (assetTypeMask.HasFlag(AssetType.Model))
 					match |= prefabType == PrefabType.ModelPrefab;
-#endif
+	#endif
 
 				return match;
 			}
@@ -199,7 +200,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			}
 
 
-#if UNITY_2019_3_OR_NEWER
+	#if UNITY_2019_3_OR_NEWER
 			if (objects.OfType<UnityEngine.UIElements.StyleSheet>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.UIElementsAssets);
 			}
@@ -207,7 +208,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			if (objects.OfType<UnityEngine.UIElements.VisualTreeAsset>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.UIElementsAssets);
 			}
-#endif
+	#endif
 
 			if (objects.OfType<AudioClip>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.Audio);
@@ -216,7 +217,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 				return assetTypeMask.HasFlag(AssetType.Video);
 			}
 
-#if UNITY_2018_4 || USE_TIMELINE
+	#if UNITY_2018_4 || USE_TIMELINE
 			if (objects.OfType<UnityEngine.Timeline.TimelineAsset>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.TimeLineAssets);
 			}
@@ -226,7 +227,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			if (objects.OfType<UnityEngine.Playables.PlayableAsset>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.TimeLineAssets);
 			}
-#endif
+	#endif
 
 			if (objects.OfType<ScriptableObject>().Any()) {
 				return assetTypeMask.HasFlag(AssetType.ScriptableObject);
@@ -336,21 +337,35 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			if (!IsActive)
 				return;
 
+			var newEntries = FilterStatusesForLockPrompt();
+			m_KnownData.RemoveAll(known => SVNStatusesDatabase.Instance.GetAllKnownStatusData(false, true, true)
+				.Where(sd => !Directory.Exists(sd.Path))
+				.All(unknown => known.Path != unknown.Path));
+
+			var (shouldLock, lockedByOtherEntries, shouldUnlock) = ClassifyLockCandidates(newEntries);
+			EnqueueLockOperations(shouldLock, lockedByOtherEntries, shouldUnlock);
+		}
+
+		private List<SVNStatusData> FilterStatusesForLockPrompt()
+		{
 			var statusDatabaseData = SVNStatusesDatabase.Instance.GetAllKnownStatusData(false, true, true)
 				.Where(sd => !Directory.Exists(sd.Path))
-				.ToList()
-				;
+				.ToList();
 
 			var newEntries = new List<SVNStatusData>();
 
-			foreach(var statusData in statusDatabaseData) {
+			foreach (var statusData in statusDatabaseData) {
 				if (AddOrUpdateKnowsStatusData(statusData)) {
 					newEntries.Add(statusData);
 				}
 			}
 
-			m_KnownData.RemoveAll(known => statusDatabaseData.All(unknown => known.Path != unknown.Path));
+			return newEntries;
+		}
 
+		private (List<SVNStatusData> shouldLock, List<SVNStatusData> lockedByOtherEntries, List<SVNStatusData> shouldUnlock)
+			ClassifyLockCandidates(List<SVNStatusData> newEntries)
+		{
 			var shouldLock = new List<SVNStatusData>(newEntries.Count);
 			var lockedByOtherEntries = new List<SVNStatusData>(newEntries.Count);
 			var shouldUnlock = new List<SVNStatusData>();
@@ -365,15 +380,14 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 				if (statusData.LockStatus == VCLockStatus.LockedHere)
 					continue;
 
-				var assetPath = statusData.Path;
-				bool isMeta = false;
-				if (statusData.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) {
-					assetPath = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
-					isMeta = true;
-				}
+				bool isMeta = statusData.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase);
+				var assetPath = WiseSVNGUIUtils.StripMetaSuffix(statusData.Path);
 
 				var lockPromptParam = m_ProjectPrefs.LockPromptParameters
 					.FirstOrDefault(al => WiseSVNIntegration.ArePathsNested(al.TargetFolder, assetPath));
+
+				if (lockPromptParam == null)
+					continue;
 
 				if (string.IsNullOrEmpty(lockPromptParam.TargetFolder))
 					continue;
@@ -398,18 +412,21 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			if (m_ProjectPrefs.AutoUnlockIfUnmodified) {
 
 				// Check for old assets to unlock.
+				var statusDatabaseData = SVNStatusesDatabase.Instance.GetAllKnownStatusData(false, true, true)
+					.Where(sd => !Directory.Exists(sd.Path));
+
 				foreach (var statusData in statusDatabaseData) {
 
 					if (statusData.Status != VCFileStatus.Normal)
 						continue;
 
-					var assetPath = statusData.Path;
-					if (statusData.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) {
-						assetPath = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
-					}
+					var assetPath = WiseSVNGUIUtils.StripMetaSuffix(statusData.Path);
 
 					var lockPromptParam = m_ProjectPrefs.LockPromptParameters
 						.FirstOrDefault(al => WiseSVNIntegration.ArePathsNested(al.TargetFolder, assetPath));
+
+					if (lockPromptParam == null)
+						continue;
 
 					if (string.IsNullOrEmpty(lockPromptParam.TargetFolder))
 						continue;
@@ -427,6 +444,14 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 				}
 			}
 
+			return (shouldLock, lockedByOtherEntries, shouldUnlock);
+		}
+
+		private void EnqueueLockOperations(
+			List<SVNStatusData> shouldLock,
+			List<SVNStatusData> lockedByOtherEntries,
+			List<SVNStatusData> shouldUnlock)
+		{
 			var shouldLog = SVNPreferencesManager.Instance.PersonalPrefs.TraceLogs.HasFlag(SVNTraceLogs.SVNOperations);
 
 			// Auto-locking has been removed. User needs to explicitly select what to lock and what not.

@@ -3,6 +3,7 @@
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
 using DevLocker.VersionControl.WiseSVN.Localization;
 using DevLocker.VersionControl.WiseSVN.Preferences;
+using DevLocker.VersionControl.WiseSVN.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,9 +41,8 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 			public LockEntryData(SVNStatusData statusData)
 			{
-				var assetPath = statusData.Path;
-				if (statusData.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) {
-					assetPath = statusData.Path.Substring(0, statusData.Path.LastIndexOf(".meta"));
+				var assetPath = WiseSVNGUIUtils.StripMetaSuffix(statusData.Path);
+				if (assetPath != statusData.Path) {
 					IsMeta = true;
 				}
 
@@ -216,9 +216,9 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 			const float OwnerSize = 140f;
 
 			#if UNITY_2019_4_OR_NEWER
-			const float RevertSize = 20f;
+			const float LockIconButtonSize = 20f;
 			#else
-			const float RevertSize = 18f;
+			const float LockIconButtonSize = 18f;
 			#endif
 
 			bool needsUpdate = false;
@@ -227,7 +227,7 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 			GUILayout.Label(Tr("lockprompt.col.lock"), EditorStyles.boldLabel, GUILayout.Width(LockColumnSize));
 			GUILayout.Label(Tr("lockprompt.col.asset"), EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
-			GUILayout.Label(Tr("lockprompt.col.revert"), EditorStyles.boldLabel, GUILayout.Width(RevertSize * 2 + 12f));
+			GUILayout.Label(Tr("lockprompt.col.revert"), EditorStyles.boldLabel, GUILayout.Width(LockIconButtonSize * 2 + 12f));
 			GUILayout.Label(Tr("lockprompt.col.owner"), EditorStyles.boldLabel, GUILayout.Width(OwnerSize));
 
 			EditorGUILayout.EndHorizontal();
@@ -246,59 +246,54 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 				EditorGUILayout.BeginHorizontal();
 
-				bool shouldDisableRow = statusData.RemoteStatus != VCRemoteFileStatus.None;
-				if (!m_AllowStealingLocks) {
-					shouldDisableRow = shouldDisableRow || lockEntry.LockedByOther;
-				}
-
-				// NOTE: This is copy-pasted below.
-				EditorGUI.BeginDisabledGroup(shouldDisableRow);
+				bool rowNeedsUpdate = statusData.RemoteStatus != VCRemoteFileStatus.None;
+				bool lockedByOther = lockEntry.LockedByOther;
+				bool shouldDisableRow = rowNeedsUpdate || (!m_AllowStealingLocks && lockedByOther);
 
 				const float LockCheckBoxWidth = 14;
-				GUILayout.Space(LockColumnSize - LockCheckBoxWidth);
-				lockEntry.ShouldLock = EditorGUILayout.Toggle(lockEntry.ShouldLock, GUILayout.Width(LockCheckBoxWidth)) && !shouldDisableRow;
 
-				hasSelected |= lockEntry.ShouldLock;
+				using (new EditorGUI.DisabledScope(shouldDisableRow)) {
+					GUILayout.Space(LockColumnSize - LockCheckBoxWidth);
+					lockEntry.ShouldLock = EditorGUILayout.Toggle(lockEntry.ShouldLock, GUILayout.Width(LockCheckBoxWidth)) && !shouldDisableRow;
 
-				// NOTE: This is copy-pasted below.
-				EditorGUI.BeginDisabledGroup(!lockEntry.ShouldLock);
+					hasSelected |= lockEntry.ShouldLock;
 
-				if (lockEntry.TargetObject == null || lockEntry.IsMeta) {
-					var assetComment = (statusData.Status == VCFileStatus.Deleted) ? Tr("lockprompt.deleted") : Tr("lockprompt.meta");
-					EditorGUILayout.BeginHorizontal();
-					EditorGUILayout.TextField($"({assetComment}) {lockEntry.AssetName}", GUILayout.ExpandWidth(true));
+					bool canEdit = lockEntry.ShouldLock && !shouldDisableRow;
+					using (new EditorGUI.DisabledScope(!canEdit)) {
+						if (lockEntry.TargetObject == null || lockEntry.IsMeta) {
+							var assetComment = (statusData.Status == VCFileStatus.Deleted) ? Tr("lockprompt.deleted") : Tr("lockprompt.meta");
+							EditorGUILayout.BeginHorizontal();
+							EditorGUILayout.TextField($"({assetComment}) {lockEntry.AssetName}", GUILayout.ExpandWidth(true));
 
-					if (statusData.IsMovedFile) {
-						UnityEngine.Object movedToObject = AssetDatabase.LoadMainAssetAtPath(statusData.MovedTo);
+							if (statusData.IsMovedFile) {
+								UnityEngine.Object movedToObject = AssetDatabase.LoadMainAssetAtPath(statusData.MovedTo);
 
-						GUILayout.Label(new GUIContent("=>", Tr("lockprompt.moved_to_tooltip")), GUILayout.ExpandWidth(false));
-						if (movedToObject) {
-							EditorGUILayout.ObjectField(movedToObject, movedToObject.GetType(), false, GUILayout.MaxWidth(100f));
-						} else {
-							EditorGUILayout.TextField(statusData.MovedTo, GUILayout.MaxWidth(100f));
+								GUILayout.Label(new GUIContent("=>", Tr("lockprompt.moved_to_tooltip")), GUILayout.ExpandWidth(false));
+								if (movedToObject) {
+									EditorGUILayout.ObjectField(movedToObject, movedToObject.GetType(), false, GUILayout.MaxWidth(100f));
+								} else {
+									EditorGUILayout.TextField(statusData.MovedTo, GUILayout.MaxWidth(100f));
+								}
+							}
+							EditorGUILayout.EndHorizontal();
+						}
+
+						// Marked for deletion file can still exist on disk. In that case - show it.
+						if (statusData.Status != VCFileStatus.Deleted || lockEntry.TargetObject) {
+							if (lockEntry.IsMeta) {
+								EditorGUILayout.ObjectField(lockEntry.TargetObject,
+									lockEntry.TargetObject ? lockEntry.TargetObject.GetType() : typeof(UnityEngine.Object),
+									false, GUILayout.MaxWidth(100f));
+							} else {
+								EditorGUILayout.ObjectField(lockEntry.TargetObject,
+									lockEntry.TargetObject ? lockEntry.TargetObject.GetType() : typeof(UnityEngine.Object),
+									false, GUILayout.ExpandWidth(true));
+							}
 						}
 					}
-					EditorGUILayout.EndHorizontal();
 				}
 
-				// Marked for deletion file can still exist on disk. In that case - show it.
-				if (statusData.Status != VCFileStatus.Deleted || lockEntry.TargetObject) {
-					if (lockEntry.IsMeta) {
-						EditorGUILayout.ObjectField(lockEntry.TargetObject,
-							lockEntry.TargetObject ? lockEntry.TargetObject.GetType() : typeof(UnityEngine.Object),
-							false, GUILayout.MaxWidth(100f));
-					} else {
-						EditorGUILayout.ObjectField(lockEntry.TargetObject,
-							lockEntry.TargetObject ? lockEntry.TargetObject.GetType() : typeof(UnityEngine.Object),
-							false, GUILayout.ExpandWidth(true));
-					}
-				}
-
-				EditorGUI.EndDisabledGroup();
-
-				EditorGUI.EndDisabledGroup();
-
-				if (GUILayout.Button(m_RevertContent, MiniIconButtonlessStyle, GUILayout.Width(RevertSize), GUILayout.Height(RevertSize))) {
+				if (GUILayout.Button(m_RevertContent, MiniIconButtonlessStyle, GUILayout.Width(LockIconButtonSize), GUILayout.Height(LockIconButtonSize))) {
 					if (statusData.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase) && (statusData.Status == VCFileStatus.Added || statusData.Status == VCFileStatus.Deleted)) {
 						if (!EditorUtility.DisplayDialog(Tr("lockprompt.revert_meta.title"), Tr("lockprompt.revert_meta.msg"), Tr("lockprompt.revert_meta.confirm"), Tr("common.cancel"))) {
 							GUIUtility.ExitGUI();
@@ -352,42 +347,38 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 
 				GUILayout.Space(4f);
 
-				MiniIconButtonlessStyle.contentOffset = new Vector2(0f, -2f);
-				if (GUILayout.Button(m_DiffContent, MiniIconButtonlessStyle, GUILayout.Width(RevertSize), GUILayout.Height(RevertSize))) {
+				var tempDiffStyle = new GUIStyle(MiniIconButtonlessStyle);
+				tempDiffStyle.contentOffset = new Vector2(0f, -2f);
+				if (GUILayout.Button(m_DiffContent, tempDiffStyle, GUILayout.Width(LockIconButtonSize), GUILayout.Height(LockIconButtonSize))) {
 					if (!string.IsNullOrEmpty(statusData.MovedTo)) {
 						SVNContextMenusManager.DiffAsset(statusData.MovedTo);
 					} else {
 						SVNContextMenusManager.DiffAsset(statusData.Path);
 					}
 				}
-				MiniIconButtonlessStyle.contentOffset = new Vector2(0f, 0f);
 
 				GUILayout.Space(4f);
 
 
-				EditorGUI.BeginDisabledGroup(shouldDisableRow);
+				using (new EditorGUI.DisabledScope(shouldDisableRow)) {
+					using (new EditorGUI.DisabledScope(!lockEntry.ShouldLock)) {
+						if (statusData.RemoteStatus == VCRemoteFileStatus.None) {
+							if (lockEntry.LockedByOther) {
+								EditorGUILayout.TextField(lockEntry.Owner, GUILayout.Width(OwnerSize));
+							} else {
+								EditorGUILayout.LabelField("", GUILayout.Width(OwnerSize));
+							}
+						} else {
+							Color prevColor = GUI.color;
+							GUI.color = Color.yellow;
 
-				EditorGUI.BeginDisabledGroup(!lockEntry.ShouldLock);
+							EditorGUILayout.LabelField(new GUIContent(Tr("lockprompt.out_of_date"), Tr("lockprompt.out_of_date.tooltip")), GUILayout.Width(OwnerSize));
+							needsUpdate = true;
 
-				if (statusData.RemoteStatus == VCRemoteFileStatus.None) {
-					if (lockEntry.LockedByOther) {
-						EditorGUILayout.TextField(lockEntry.Owner, GUILayout.Width(OwnerSize));
-					} else {
-						EditorGUILayout.LabelField("", GUILayout.Width(OwnerSize));
+							GUI.color = prevColor;
+						}
 					}
-				} else {
-					Color prevColor = GUI.color;
-					GUI.color = Color.yellow;
-
-					EditorGUILayout.LabelField(new GUIContent(Tr("lockprompt.out_of_date"), Tr("lockprompt.out_of_date.tooltip")), GUILayout.Width(OwnerSize));
-					needsUpdate = true;
-
-					GUI.color = prevColor;
 				}
-
-				EditorGUI.EndDisabledGroup();
-
-				EditorGUI.EndDisabledGroup();
 
 				EditorGUILayout.EndHorizontal();
 			}
@@ -441,25 +432,24 @@ namespace DevLocker.VersionControl.WiseSVN.LockPrompting
 				Close();
 			}
 
-			EditorGUI.BeginDisabledGroup(!hasSelected);
+			using (new EditorGUI.DisabledScope(!hasSelected)) {
 
-			GUI.backgroundColor = m_AllowStealingLocks ? Color.red : Color.green;
-			var lockSelectedButtonText = m_AllowStealingLocks ? Tr("lockprompt.btn.lock_or_steal_selected") : Tr("lockprompt.btn.lock_selected");
+				GUI.backgroundColor = m_AllowStealingLocks ? Color.red : Color.green;
+				var lockSelectedButtonText = m_AllowStealingLocks ? Tr("lockprompt.btn.lock_or_steal_selected") : Tr("lockprompt.btn.lock_selected");
 
-			if (GUILayout.Button(lockSelectedButtonText)) {
-				var selectedStatusData = m_LockEntries
-					.Where(e => e.ShouldLock)
-					.Select(e => e.StatusData)
-					.ToList();
+				if (GUILayout.Button(lockSelectedButtonText)) {
+					var selectedStatusData = m_LockEntries
+						.Where(e => e.ShouldLock)
+						.Select(e => e.StatusData)
+						.ToList();
 
-				if (selectedStatusData.Any()) {
-					SVNLockPromptDatabase.Instance.LockEntries(selectedStatusData, m_AllowStealingLocks);
+					if (selectedStatusData.Any()) {
+						SVNLockPromptDatabase.Instance.LockEntries(selectedStatusData, m_AllowStealingLocks);
+					}
+					Close();
 				}
-				Close();
+				GUI.backgroundColor = prevBackgroundColor;
 			}
-			GUI.backgroundColor = prevBackgroundColor;
-
-			EditorGUI.EndDisabledGroup();
 
 			EditorGUILayout.EndHorizontal();
 		}

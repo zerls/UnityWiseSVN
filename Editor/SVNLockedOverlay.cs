@@ -61,6 +61,20 @@ namespace DevLocker.VersionControl.WiseSVN
 		[NonSerialized]
 		private bool m_DatabaseChanged = false;
 
+		private const float CloseButtonSize = 18f;
+		private const float CloseButtonPadding = 6f;
+		private const float IconVerticalAdjust = -4f;
+
+		private struct OverlayData
+		{
+			public string Message;
+			public float MessageWidth;
+			public GUIContent Icon;
+			public Rect MessageRect;
+			public Rect CloseRect;
+			public Rect IconRect;
+		}
+
 		private SVNPreferencesManager.PersonalPreferences m_PersonalPrefs => SVNPreferencesManager.Instance.PersonalPrefs;
 
 		private bool IsActive => m_PersonalPrefs.EnableCoreIntegration
@@ -156,7 +170,10 @@ namespace DevLocker.VersionControl.WiseSVN
 
 				if (statusData.RemoteStatus != VCRemoteFileStatus.None) {
 					m_SceneMessage += Tr("sceneview.scene_outofdate", scene.name) + "\n";
-					m_SceneMessageIcon = SVNPreferencesManager.Instance.GetRemoteStatusIconContent(VCRemoteFileStatus.Modified);
+					// Remote-out-of-date: use a neutral info icon (no per-status texture available since
+					// GetRemoteStatusIconContent was removed; the remote emoji is only suitable for the
+					// small Project-window overlay slot, not for SceneView banners).
+					m_SceneMessageIcon = EditorGUIUtility.IconContent("console.infoicon");
 
 				} else if (statusData.LockStatus == VCLockStatus.LockedOther || statusData.LockStatus == VCLockStatus.LockedButStolen) {
 					m_SceneMessage += Tr("sceneview.scene_locked", scene.name, statusData.LockDetails.Owner) + "\n";
@@ -220,7 +237,7 @@ namespace DevLocker.VersionControl.WiseSVN
 
 				if (statusData.RemoteStatus != VCRemoteFileStatus.None) {
 					m_PrefabMessage = Tr("sceneview.prefab_outofdate", Path.GetFileNameWithoutExtension(prefabPath));
-					m_PrefabMessageIcon = SVNPreferencesManager.Instance.GetRemoteStatusIconContent(VCRemoteFileStatus.Modified);
+					m_PrefabMessageIcon = EditorGUIUtility.IconContent("console.infoicon");
 
 				} else if (statusData.LockStatus == VCLockStatus.LockedOther || statusData.LockStatus == VCLockStatus.LockedButStolen) {
 					m_PrefabMessage = Tr("sceneview.prefab_locked", Path.GetFileNameWithoutExtension(prefabPath), statusData.LockDetails.Owner);
@@ -238,6 +255,80 @@ namespace DevLocker.VersionControl.WiseSVN
 			m_UserClosedOverlay = false;
 		}
 
+		private void BuildOverlayRects(float targetWidth, float sceneViewWidth, out Rect messageRect, out Rect closeRect, out Rect iconRect)
+		{
+			const float height = 70f;
+			float width = Mathf.Max(300, targetWidth + 40f);
+
+			messageRect = new Rect();
+			messageRect.x = sceneViewWidth / 2f - width / 2f;
+			messageRect.y = 32;
+			messageRect.width = width;
+			messageRect.height = height;
+
+			closeRect = new Rect();
+			closeRect.x = messageRect.x + messageRect.width - CloseButtonSize + CloseButtonPadding;
+			closeRect.y = messageRect.y - CloseButtonPadding;
+			closeRect.width = closeRect.height = CloseButtonSize;
+
+			iconRect = new Rect();
+			iconRect.width = iconRect.height = 40f;
+			iconRect.x = messageRect.x + messageRect.width / 2f - iconRect.width / 2f;
+			iconRect.y = messageRect.y + messageRect.height - iconRect.height / 2f + IconVerticalAdjust;
+		}
+
+		private OverlayData? GetOverlayMessage()
+		{
+			CheckScenes();
+			CheckPrefab();
+
+			if (m_DatabaseChanged) {
+				if (!m_UserClosedOverlay) {
+					RefreshScenesMessage();
+					RefreshPrefabMessage(GetOpenedPrefabPath());
+				}
+				m_DatabaseChanged = false;
+			}
+
+			bool hasMessage = (!string.IsNullOrEmpty(m_SceneMessage) && string.IsNullOrEmpty(m_CurrentPrefabPath)) || !string.IsNullOrEmpty(m_PrefabMessage);
+
+			if (m_UserClosedOverlay || !hasMessage)
+				return null;
+
+			OverlayData data = new OverlayData();
+
+			if (!string.IsNullOrEmpty(m_PrefabMessage)) {
+				data.Message = m_PrefabMessage;
+				data.MessageWidth = m_PrefabMessageWidth;
+				data.Icon = m_PrefabMessageIcon;
+			} else {
+				data.Message = m_SceneMessage;
+				data.MessageWidth = m_SceneMessageWidth;
+				data.Icon = m_SceneMessageIcon;
+			}
+
+			return data;
+		}
+
+		private void DrawOverlayPanel(Rect messageRect, Rect closeRect, Rect iconRect, string message, GUIContent icon)
+		{
+			var prevBackgroundColor = GUI.backgroundColor;
+			GUI.backgroundColor = Color.red;
+
+			GUI.Box(messageRect, message, GetMessageStyle());
+			GUI.Label(iconRect, icon);
+
+			var prevColor = GUI.color;
+			GUI.color = Color.white;
+
+			if (GUI.Button(closeRect, "X")) {
+				m_UserClosedOverlay = true;
+			}
+
+			GUI.color = prevColor;
+			GUI.backgroundColor = prevBackgroundColor;
+		}
+
 		private void SceneViewOnGUI(SceneView sceneView)
 		{
 			if (Application.isPlaying || !SVNStatusesDatabase.Instance.IsReady)
@@ -245,68 +336,13 @@ namespace DevLocker.VersionControl.WiseSVN
 
 			Handles.BeginGUI();
 
-			CheckScenes();
+			var overlay = GetOverlayMessage();
 
-			CheckPrefab();
+			if (overlay.HasValue) {
+				BuildOverlayRects(overlay.Value.MessageWidth, sceneView.position.width,
+					out Rect messageRect, out Rect closeRect, out Rect iconRect);
 
-			// Force refresh with database as status may have changed.
-			// Call this in OnGUI as refresh calls GUI functions for calculating text width that can run only here.
-			if (m_DatabaseChanged) {
-				if (!m_UserClosedOverlay) {
-					RefreshScenesMessage();
-					RefreshPrefabMessage(GetOpenedPrefabPath());
-				}
-
-				m_DatabaseChanged = false;
-			}
-
-			bool hasMessage = !string.IsNullOrEmpty(m_SceneMessage) && string.IsNullOrEmpty(m_CurrentPrefabPath) || !string.IsNullOrEmpty(m_PrefabMessage);
-
-			if (!m_UserClosedOverlay && hasMessage) {
-				string targetMessage = string.IsNullOrEmpty(m_PrefabMessage) ? m_SceneMessage : m_PrefabMessage;
-				float targetWidth = string.IsNullOrEmpty(m_PrefabMessage) ? m_SceneMessageWidth : m_PrefabMessageWidth;
-				GUIContent icon = string.IsNullOrEmpty(m_PrefabMessage) ? m_SceneMessageIcon : m_PrefabMessageIcon;
-
-				float width = Mathf.Max(300, targetWidth + 40f);
-				const float height = 70f;
-
-				Rect messageRect = new Rect();
-				messageRect.x = sceneView.position.width / 2f - width / 2f;
-				messageRect.y = 32;
-				messageRect.width = width;
-				messageRect.height = height;
-
-				const float closeSize = 18f;
-				const float closeOffset = 6f;
-
-				Rect closeRect = new Rect();
-				closeRect.x = messageRect.x + messageRect.width - closeSize + closeOffset;
-				closeRect.y = messageRect.y - closeOffset;
-				closeRect.width = closeRect.height = closeSize;
-
-				Rect iconRect = new Rect();
-				iconRect.width = iconRect.height = 40f;
-				iconRect.x = messageRect.x + messageRect.width / 2f - iconRect.width / 2f;
-				iconRect.y = messageRect.y + messageRect.height - iconRect.height / 2f - 4f;
-
-				var prevBackgroundColor = GUI.backgroundColor;
-				GUI.backgroundColor = Color.red;
-
-
-				GUI.Box(messageRect, targetMessage, GetMessageStyle());
-				GUI.Label(iconRect, icon);
-
-				// HACK: the text color of the box is done in the style, because it breaks
-				//		 when unity starts and displays it immediately.
-				var prevColor = GUI.color;
-				GUI.color = Color.white;
-
-				if (GUI.Button(closeRect, "X")) {
-					m_UserClosedOverlay = true;
-				}
-
-				GUI.color = prevColor;
-				GUI.backgroundColor = prevBackgroundColor;
+				DrawOverlayPanel(messageRect, closeRect, iconRect, overlay.Value.Message, overlay.Value.Icon);
 			}
 
 			Handles.EndGUI();
