@@ -2,6 +2,7 @@
 
 using DevLocker.VersionControl.WiseSVN.ContextMenus;
 using DevLocker.VersionControl.WiseSVN.Localization;
+using DevLocker.VersionControl.WiseSVN.Utils;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -173,40 +174,30 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 #endif
 
 			string showLogTooltip = Tr("branches.show_log.tooltip");
-			RepoBrowserContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-RepoBrowser", Tr("branches.repo_browser.tooltip"));
-			ShowLogContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ShowLog", showLogTooltip);
-			SwitchBranchContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Switch", Tr("branches.switch.tooltip"));
+			RepoBrowserContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-RepoBrowser", "R");
+			RepoBrowserContent.tooltip = Tr("branches.repo_browser.tooltip");
+			ShowLogContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ShowLog", "L");
+			ShowLogContent.tooltip = showLogTooltip;
+			SwitchBranchContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-Switch", "S");
+			SwitchBranchContent.tooltip = Tr("branches.switch.tooltip");
 
-			ScanForConflictsContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ScanForConflicts", Tr("branches.scan_conflicts.tooltip"));
+			ScanForConflictsContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ScanForConflicts", "C");
+			ScanForConflictsContent.tooltip = Tr("branches.scan_conflicts.tooltip");
 
-			ConflictsPendingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Pending", Tr("branches.conflicts.pending") + "\n\n" + showLogTooltip);
-			ConflictsFoundContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-Conflicts-Found", Tr("branches.conflicts.found") + "\n\n" + showLogTooltip);
-			ConflictsNormalContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Normal", Tr("branches.conflicts.normal") + "\n\n" + showLogTooltip);
-			ConflictsAddedContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Added", Tr("branches.conflicts.added") + "\n\n" + showLogTooltip);
-			ConflictsMissingContent = Preferences.SVNPreferencesManager.LoadTexture("BranchesIcons/SVN-ConflictsScan-Missing", Tr("branches.conflicts.missing") + "\n\n" + showLogTooltip);
-			ConflictsErrorContent = new GUIContent(EditorGUIUtility.FindTexture("console.erroricon.sml"), Tr("branches.conflicts.error") + "\n\n" + showLogTooltip);
+			ConflictsPendingContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ConflictsScan-Pending", "P");
+			ConflictsPendingContent.tooltip = Tr("branches.conflicts.pending") + "\n\n" + showLogTooltip;
+			ConflictsFoundContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-Conflicts-Found", "C");
+			ConflictsFoundContent.tooltip = Tr("branches.conflicts.found") + "\n\n" + showLogTooltip;
+			ConflictsNormalContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ConflictsScan-Normal", "N");
+			ConflictsNormalContent.tooltip = Tr("branches.conflicts.normal") + "\n\n" + showLogTooltip;
+			ConflictsAddedContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ConflictsScan-Added", "A");
+			ConflictsAddedContent.tooltip = Tr("branches.conflicts.added") + "\n\n" + showLogTooltip;
+			ConflictsMissingContent = WiseSVNGUIUtils.CreateIconWithTextFallback("BranchesIcons/SVN-ConflictsScan-Missing", "M");
+			ConflictsMissingContent.tooltip = Tr("branches.conflicts.missing") + "\n\n" + showLogTooltip;
+			ConflictsErrorContent = WiseSVNGUIUtils.CreateIconWithTextFallback("console.erroricon.sml", "E");
+			ConflictsErrorContent.tooltip = Tr("branches.conflicts.error") + "\n\n" + showLogTooltip;
 
-			if (RepoBrowserContent.image == null) RepoBrowserContent.text = "R";
-			if (ShowLogContent.image == null) ShowLogContent.text = "L";
-			if (SwitchBranchContent.image == null) SwitchBranchContent.text = "S";
-
-			if (ScanForConflictsContent.image == null) ScanForConflictsContent.text = "C";
-
-			if (ConflictsPendingContent.image == null) ConflictsPendingContent.text = "P";
-			if (ConflictsFoundContent.image == null) ConflictsFoundContent.text = "C";
-			if (ConflictsNormalContent.image == null) ConflictsNormalContent.text = "N";
-			if (ConflictsAddedContent.image == null) ConflictsAddedContent.text = "A";
-			if (ConflictsMissingContent.image == null) ConflictsMissingContent.text = "M";
-			if (ConflictsErrorContent.image == null) ConflictsErrorContent.text = "E";
-
-			MiniIconButtonlessStyle = new GUIStyle(GUI.skin.button);
-			MiniIconButtonlessStyle.hover.background = MiniIconButtonlessStyle.normal.background;
-			MiniIconButtonlessStyle.hover.scaledBackgrounds = MiniIconButtonlessStyle.normal.scaledBackgrounds;
-			MiniIconButtonlessStyle.hover.textColor = GUI.skin.label.hover.textColor;
-			MiniIconButtonlessStyle.normal.background = null;
-			MiniIconButtonlessStyle.normal.scaledBackgrounds = null;
-			MiniIconButtonlessStyle.padding = new RectOffset();
-			MiniIconButtonlessStyle.margin = new RectOffset();
+			MiniIconButtonlessStyle = WiseSVNGUIUtils.MakeMiniButtonlessStyle();
 
 			// Do it before BranchLabelStyle copies the style.
 			Preferences.SVNPreferencesWindow.MigrateButtonStyleToUIElementsIfNeeded(MiniIconButtonlessStyle);
@@ -664,11 +655,53 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 			}
 		}
 
-		private static void GatherConflicts(object param)
+		private static (string start, string end) FormatSVNDateRange(ConflictsScanLimitType type, int count)
 		{
-			var jobData = (ConflictsScanJobData)param;
-			var results = jobData.Reults;
+			const string svnDateFormat = "yyyy-MM-dd";
+			switch (type) {
+				case ConflictsScanLimitType.Days:
+					return ("{" + System.DateTime.Now.AddDays(-1 * count).ToString(svnDateFormat) + "}", "HEAD");
+				case ConflictsScanLimitType.Weeks:
+					return ("{" + System.DateTime.Now.AddDays(-1 * 7 * count).ToString(svnDateFormat) + "}", "HEAD");
+				case ConflictsScanLimitType.Months:
+					return ("{" + System.DateTime.Now.AddMonths(-1 * count).ToString(svnDateFormat) + "}", "HEAD");
+				default:
+					return (null, null);
+			}
+		}
 
+		private static LogOperationResult FetchBranchLog(string targetURL, LogParams logParams, List<LogEntry> logEntries)
+		{
+			return WiseSVNIntegration.Log(targetURL, logParams, logEntries, 60000 * 5);
+		}
+
+		private static ConflictState DetectPathConflicts(string targetRelativeURL, List<LogEntry> logEntries)
+		{
+			foreach (var logEntry in logEntries) {
+				var logPath = logEntry.AffectedPaths.FirstOrDefault(ap => ap.Path.StartsWith(targetRelativeURL));
+
+				// If not found in the affected paths -> this is the log entry of the branch copy.
+				if (string.IsNullOrEmpty(logPath.Path))
+					continue;
+
+				// Don't consider folder children for "Added" and "Deleted". Folders are just modified by their children.
+				if (logPath.Path != targetRelativeURL)
+					return ConflictState.Conflicted;
+
+				if (logPath.Added || logPath.Replaced) {
+					return ConflictState.Added;
+				}
+
+				if (logPath.Deleted) {
+					return ConflictState.Missing;
+				}
+			}
+
+			return ConflictState.Normal;
+		}
+
+		private static void BuildConflictReport(ConflictsScanJobData jobData, ConflictsScanResult[] results)
+		{
 			var logParams = new LogParams() {
 				FetchAffectedPaths = true,
 				FetchCommitMessages = false,
@@ -676,35 +709,14 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 				Limit = 10,
 			};
 
-			const string svnDateFormat = "yyyy-MM-dd";
-			switch (jobData.LimitType) {
-				case ConflictsScanLimitType.Days:
-					logParams.RangeStart = "{" + System.DateTime.Now.AddDays(-1 * jobData.LimitParam).ToString(svnDateFormat) + "}";
-					logParams.RangeEnd = "HEAD";
-					break;
-
-				case ConflictsScanLimitType.Weeks:
-					logParams.RangeStart = "{" + System.DateTime.Now.AddDays(-1 * 7 * jobData.LimitParam).ToString(svnDateFormat) + "}";
-					logParams.RangeEnd = "HEAD";
-					break;
-
-				case ConflictsScanLimitType.Months:
-					logParams.RangeStart = "{" + System.DateTime.Now.AddMonths(-1 * jobData.LimitParam).ToString(svnDateFormat) + "}";
-					logParams.RangeEnd = "HEAD";
-					break;
-
-				case ConflictsScanLimitType.Revisions:
-					// Revisions are calculated per branch. Do nothing here.
-					break;
-
-				case ConflictsScanLimitType.Unlimited:
-					logParams.RangeStart = "";
-					break;
-
-				default:
-					Debug.LogError($"Unsupported ConflictsScanLimitType {jobData.LimitType} with param {jobData.LimitParam}");
-					break;
+			var (rangeStart, rangeEnd) = FormatSVNDateRange(jobData.LimitType, jobData.LimitParam);
+			if (rangeStart != null) {
+				logParams.RangeStart = rangeStart;
+				logParams.RangeEnd = rangeEnd;
+			} else if (jobData.LimitType == ConflictsScanLimitType.Unlimited) {
+				logParams.RangeStart = "";
 			}
+			// Revisions are calculated per branch below.
 
 			List<LogEntry> logEntries = new List<LogEntry>();
 
@@ -735,7 +747,7 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 					}
 				}
 
-				var opResult = WiseSVNIntegration.Log(targetURL, logParams, logEntries, 60000 * 5);
+				var opResult = FetchBranchLog(targetURL, logParams, logEntries);
 
 				// Either it doesn't exist in this branch or it was moved / deleted. Can't know for sure without some deep digging.
 				if (opResult == LogOperationResult.NotFound) {
@@ -750,35 +762,16 @@ namespace DevLocker.VersionControl.WiseSVN.Branches
 					continue;
 				}
 
-				result.State = ConflictState.Normal;
-
-				foreach(var logEntry in logEntries) {
-					var logPath = logEntry.AffectedPaths.FirstOrDefault(ap => ap.Path.StartsWith(targetRelativeURL));
-
-					// If not found in the affected paths -> this is the log entry of the branch copy.
-					if (string.IsNullOrEmpty(logPath.Path))
-						continue;
-
-					result.State = ConflictState.Conflicted;
-
-					// Don't consider folder children for "Added" and "Deleted". Folders are just modified by their children.
-					if (logPath.Path != targetRelativeURL)
-						continue;
-
-					if (logPath.Added || logPath.Replaced) {
-						result.State = ConflictState.Added;
-						break;
-					}
-
-					if (logPath.Deleted) {
-						result.State = ConflictState.Missing;
-						break;
-					}
-				}
-
+				result.State = DetectPathConflicts(targetRelativeURL, logEntries);
 
 				results[i] = result;
 			}
+		}
+
+		private static void GatherConflicts(object param)
+		{
+			var jobData = (ConflictsScanJobData)param;
+			BuildConflictReport(jobData, jobData.Reults);
 		}
 	}
 }

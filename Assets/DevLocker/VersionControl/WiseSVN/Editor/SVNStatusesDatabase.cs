@@ -288,13 +288,44 @@ namespace DevLocker.VersionControl.WiseSVN
 				GatherStatusDataInThreadRecursive("", statuses, unversionedFolders, nestedRepositories, reporter);
 				statuses.RemoveAll(s => !s.Path.StartsWith("Assets/") && !s.Path.StartsWith("Packages/"));
 
-				// NTFS junctions (mklink /J) — svn status against the project root won't
-				// descend into reparse points, so files reachable only through junctions
-				// are missing from the scan. Run a separate svn status against each
-				// junction's real working-copy path, then translate the output paths back
-				// to the asset-relative junction path so AssetDatabase.AssetPathToGUID
-				// keys line up. See Utils/JunctionResolver.cs for the prefix table.
+				// NTFS junctions (mklink /J): the main scan sees each junction root as
+				// "? Unversioned" (the .svn metadata is in the REAL target directory, not the
+				// link path). Keeping these entries causes two problems:
+				//
+				//   1. The junction folder gets Unversioned status in m_Data. When files inside
+				//      ARE modified, AddModifiedFolders overwrites that with Modified (correct).
+				//      After commit, the next scan adds Unversioned again — folder shows
+				//      Unversioned even though the real WC is clean. Icon is wrong.
+				//
+				//   2. GetKnownStatusData falls back to m_UnversionedFolders for any GUID
+				//      under the junction prefix, returning Unversioned for committed Normal
+				//      files because the junction root was in that list.
+				//
+				// Fix: strip junction root entries from both lists here. The junction scan
+				// below will query the REAL working-copy path and get the correct status.
+				// AddModifiedFolders propagation from modified files inside will still set
+				// the folder icon to Modified when appropriate; if all files are clean the
+				// junction folder simply has no entry (Normal / no icon).
 				if (Utils.JunctionResolver.HasJunctions) {
+					var junctionRoots = Utils.JunctionResolver.EnumerateJunctionRoots();
+					statuses.RemoveAll(s => {
+						string bare = s.Path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)
+							? s.Path.Substring(0, s.Path.Length - 5)
+							: s.Path;
+						foreach (var root in junctionRoots) {
+							if (string.Equals(bare, root, StringComparison.OrdinalIgnoreCase))
+								return true;
+						}
+						return false;
+					});
+					for (int i = unversionedFolders.Count - 1; i >= 0; i--) {
+						foreach (var root in junctionRoots) {
+							if (string.Equals(unversionedFolders[i], root, StringComparison.OrdinalIgnoreCase)) {
+								unversionedFolders.RemoveAt(i);
+								break;
+							}
+						}
+					}
 					GatherJunctionStatusesInThread(statuses, unversionedFolders, reporter);
 				}
 

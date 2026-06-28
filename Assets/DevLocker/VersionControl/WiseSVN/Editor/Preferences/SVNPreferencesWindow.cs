@@ -25,6 +25,8 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 		}
 
 		private static int m_RandomVideoIndex = -1;
+		// Phase 7: 缓存 urlStyle，避免每次 DrawHelpAbout 调用都分配新的 GUIStyle
+		private static GUIStyle s_UrlStyle;
 		private static Dictionary<string, string> m_RandomVideos = new Dictionary<string, string>() {
 			{ "Fire-Arrows!", "https://www.youtube.com/watch?v=zTd_0FRAwOQ" },
 			{ "Climate Change Is An Absolute Nightmare", "https://www.youtube.com/watch?v=uqwvf6R1_QY" },
@@ -606,14 +608,18 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 			EditorGUILayout.LabelField(Tr("prefs.about"), EditorStyles.boldLabel);
 			{
-				var urlStyle = new GUIStyle(EditorStyles.label);
-				urlStyle.normal.textColor = EditorGUIUtility.isProSkin ? new Color(1.00f, 0.65f, 0.00f) : Color.blue;
-				urlStyle.active.textColor = Color.red;
+				// 缓存 urlStyle 避免每次 DrawHelpAbout 调用都重新分配 GUIStyle
+				if (s_UrlStyle == null) {
+					s_UrlStyle = new GUIStyle(EditorStyles.label);
+					s_UrlStyle.normal.textColor = EditorGUIUtility.isProSkin
+						? new Color(1.00f, 0.65f, 0.00f) : Color.blue;
+					s_UrlStyle.active.textColor = Color.red;
+				}
 
 				const string mail = "NibbleByte3@gmail.com";
 
 				GUILayout.Label(Tr("prefs.created_by"), GUILayout.ExpandWidth(false));
-				if (GUILayout.Button(mail, urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(mail, s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("mailto:"+mail);
 				}
 
@@ -622,30 +628,30 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 
 				EditorGUILayout.BeginHorizontal();
 
-				if (GUILayout.Button(Tr("prefs.asset_store"), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.asset_store"), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("https://assetstore.unity.com/packages/tools/version-control/wise-svn-162636");
 				}
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-				if (GUILayout.Button(Tr("prefs.github"), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.github"), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("https://github.com/NibbleByte/UnityWiseSVN");
 				}
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-				if (GUILayout.Button(Tr("prefs.unity_forum"), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.unity_forum"), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("https://forum.unity.com/threads/wise-svn-powerful-tortoisesvn-snailsvn-integration.844168");
 				}
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-				if (GUILayout.Button(Tr("prefs.reddit"), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.reddit"), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("https://www.reddit.com/r/Unity3D/comments/fgjovk/finally_a_fully_working_tortoisesvn_snailsvn");
 				}
 				GUILayout.Label("|", GUILayout.ExpandWidth(false));
-				if (GUILayout.Button(Tr("prefs.openupm"), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(Tr("prefs.openupm"), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL("https://openupm.com/packages/devlocker.versioncontrol.wisesvn");
 				}
 
 				EditorGUILayout.EndHorizontal();
 				EditorGUILayout.Space();
 
-				if (GUILayout.Button(Tr("prefs.icons_credit"), urlStyle, GUILayout.ExpandWidth(true))) {
+				if (GUILayout.Button(Tr("prefs.icons_credit"), s_UrlStyle, GUILayout.ExpandWidth(true))) {
 					Application.OpenURL("https://tortoisesvn.net/");
 				}
 
@@ -658,7 +664,7 @@ namespace DevLocker.VersionControl.WiseSVN.Preferences
 					m_RandomVideoIndex = UnityEngine.Random.Range(0, m_RandomVideos.Count);
 				}
 
-				if (GUILayout.Button(m_RandomVideos.Keys.ElementAt(m_RandomVideoIndex), urlStyle, GUILayout.ExpandWidth(false))) {
+				if (GUILayout.Button(m_RandomVideos.Keys.ElementAt(m_RandomVideoIndex), s_UrlStyle, GUILayout.ExpandWidth(false))) {
 					Application.OpenURL(m_RandomVideos.Values.ElementAt(m_RandomVideoIndex));
 				}
 				if (GUILayout.Button(Tr("prefs.next_video"), GUILayout.ExpandWidth(false))) {

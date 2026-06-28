@@ -165,14 +165,27 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 		}
 
 		private double m_LastChangeTick;
+		// Set to true whenever RunCacheMissFill writes new or changed entries.
+		// TickStatusesChanged only fires when this is true — prevents the periodic
+		// heartbeat from triggering repaints (and the Normal↔Modified flicker they
+		// cause) when nothing actually changed in the TSVNCache data.
+		private volatile bool m_CacheHasNewData;
+
 		private void TickStatusesChanged()
 		{
-			// Fire StatusesChanged once per ~5s so Project window picks up FS-driven changes
-			// without needing a Unity import event. Cheap — no work happens unless subscribers care.
 			double now = EditorApplication.timeSinceStartup;
 			if (now - m_LastChangeTick < k_CacheTTL) return;
 			m_LastChangeTick = now;
-			StatusesChanged?.Invoke();
+
+			// Only repaint when the background fill actually produced new data.
+			// Unconditional firing every 5 s was causing the folder Normal↔Modified
+			// flicker: the tick fired while CLI DB was mid-rebuild (m_Data.Clear() done
+			// but AddModifiedFolders not yet run), so the Project window saw a transient
+			// "Normal" frame before the modified-folder entry was re-added.
+			if (m_CacheHasNewData) {
+				m_CacheHasNewData = false;
+				StatusesChanged?.Invoke();
+			}
 		}
 
 		// ── ISVNStatusProvider ───────────────────────────────────────────────
@@ -189,20 +202,32 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			string nativePath = ToNativePath(assetPath);
 			double now = NowSeconds();
 
+			// Try cache first. When an entry exists but is stale, return the STALE value
+			// instead of None — this prevents the icon flicker pattern where:
+			//   (1) TTL expires → ItemOnGUI sees None → icon disappears for one frame
+			//   (2) background fill completes → StatusesChanged fires → icon reappears
+			// Returning stale data while enqueueing a refresh gives a continuous visual
+			// with no flicker. The refresh still happens; when new data arrives it either
+			// confirms the same status (no visible change) or triggers a proper repaint.
+			SVNStatusData staleEntry = default;
 			lock (m_CacheLock) {
-				if (m_Cache.TryGetValue(nativePath, out var entry) && now - entry.timestamp < k_CacheTTL)
-					return entry.status;
+				if (m_Cache.TryGetValue(nativePath, out var entry)) {
+					if (now - entry.timestamp < k_CacheTTL)
+						return entry.status;          // fresh hit — no cost
+					staleEntry = entry.status;        // stale — use while we refresh
+				}
 			}
 
-			// Cache miss — don't block Unity's GUI thread with a sync pipe query.
-			// Queue this path for the background filler and return None for now.
-			// Once the worker fills it, StatusesChanged repaints the Project window
-			// and the next ItemOnGUI tick will hit the cache.
+			// Enqueue a background refresh. The fill worker will update the cache and
+			// fire StatusesChanged when it's done, causing a clean repaint.
 			lock (m_PendingLock) {
 				m_PendingPaths.Add(nativePath);
 			}
 			ScheduleCacheMissFill();
-			return new SVNStatusData { Status = VCFileStatus.None };
+
+			// Return stale entry if we have one, otherwise None (true cold miss).
+			return staleEntry.Status != VCFileStatus.None ? staleEntry
+				: new SVNStatusData { Status = VCFileStatus.None };
 		}
 
 		private void ScheduleCacheMissFill()
@@ -238,9 +263,15 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 
 					var status = QueryPipe(path);
 
+					bool changed;
 					lock (m_CacheLock) {
+						// Only mark dirty when the status actually differs from any previous entry.
+						// This suppresses spurious ticks when TSVNCache confirms an unchanged state.
+						changed = !m_Cache.TryGetValue(path, out var prev)
+							|| !prev.status.EqualStatuses(status, skipOnline: false);
 						m_Cache[path] = (status, NowSeconds());
 					}
+					if (changed) m_CacheHasNewData = true;
 					filled++;
 				}
 			} catch (Exception ex) {
@@ -249,8 +280,12 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 				lock (m_PendingLock) {
 					m_FillRunning = false;
 				}
-				// Re-fire on the main thread so consumers can refresh the Project window.
-				EditorApplication.delayCall += () => StatusesChanged?.Invoke();
+				// Fire StatusesChanged on the main thread only when new/changed data was found.
+				// Skipping the fire when nothing changed avoids the spurious repaint that was
+				// causing Normal↔Modified flicker during CLI DB rebuilds.
+				if (m_CacheHasNewData) {
+					EditorApplication.delayCall += () => StatusesChanged?.Invoke();
+				}
 			}
 		}
 
@@ -564,9 +599,22 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			       $"textStatus={h.textStatus} propStatus={h.propStatus} status={h.status} cmtRev={h.cmtRev}";
 		}
 
-		// ── Path helpers ─────────────────────────────────────────────────────		// TSVNCache expects absolute paths with backslashes — never apply ToLower (case-sensitive on the wire).
+		// ── Path helpers ─────────────────────────────────────────────────────
+		// TSVNCache expects absolute paths with backslashes — never apply ToLower (case-sensitive on the wire).
 		private static string ToNativePath(string assetPath)
 		{
+			// For junction-mapped paths, translate to the REAL working-copy path before
+			// sending to TSVNCache. Without this, TSVNCache receives the link path
+			// (F:\...\Assets\MkLink-Test_) and may not resolve it to the working copy
+			// whose .svn lives at D:\Real\Path. Querying the real path directly guarantees
+			// TSVNCache reads from the correct WC metadata.
+			if (Utils.JunctionResolver.HasJunctions) {
+				string real = Utils.JunctionResolver.ToRealPath(assetPath);
+				if (!ReferenceEquals(real, assetPath)) {
+					// Already an absolute path — just normalize slashes.
+					return real.Replace('/', '\\');
+				}
+			}
 			if (Path.IsPathRooted(assetPath))
 				return assetPath.Replace('/', '\\');
 			return Path.Combine(WiseSVNIntegration.ProjectRootNative, assetPath).Replace('/', '\\');
@@ -578,6 +626,13 @@ namespace DevLocker.VersionControl.WiseSVN.Providers
 			if (nativePath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) {
 				string rel = nativePath.Substring(root.Length).TrimStart('\\', '/');
 				return rel.Replace('\\', '/');
+			}
+			// For real paths outside the project root (e.g. junction targets like D:\Real\Path\file.txt),
+			// translate back to the Unity asset path via JunctionResolver reverse mapping.
+			if (Utils.JunctionResolver.HasJunctions) {
+				string assetPath = Utils.JunctionResolver.ToAssetPath(nativePath.Replace('\\', '/'));
+				if (!ReferenceEquals(assetPath, nativePath))
+					return assetPath;
 			}
 			return nativePath.Replace('\\', '/');
 		}

@@ -100,7 +100,12 @@ namespace DevLocker.VersionControl.WiseSVN.Utils
 			try {
 				foreach (var kv in s_LinkToReal) {
 					if (PathStartsWith(p, kv.Key)) {
-						return kv.Value + p.Substring(kv.Key.Length);
+						// kv.Key always has a trailing '/'. When p is the exact junction root
+						// (no trailing slash, p.Length == kv.Key.Length - 1), Substring(kv.Key.Length)
+						// would be out of range. Guard: return the real root path directly in that case.
+						return p.Length >= kv.Key.Length
+							? kv.Value + p.Substring(kv.Key.Length)
+							: kv.Value;
 					}
 				}
 			} finally { s_Lock.ExitReadLock(); }
@@ -121,7 +126,10 @@ namespace DevLocker.VersionControl.WiseSVN.Utils
 			try {
 				foreach (var kv in s_RealToLink) {
 					if (PathStartsWith(p, kv.Key)) {
-						return kv.Value + p.Substring(kv.Key.Length);
+						// Same guard as ToRealPath — exact root match has no suffix to extract.
+						return p.Length >= kv.Key.Length
+							? kv.Value + p.Substring(kv.Key.Length)
+							: kv.Value;
 					}
 				}
 			} finally { s_Lock.ExitReadLock(); }
